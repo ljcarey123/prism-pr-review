@@ -69,7 +69,7 @@ Working through the git data, produce a structured analysis.
   - Low: well-tested utility changes, docs, formatting
 - `risk_reason`: one sentence explaining the risk rating
 - `components[]`: which logical areas of the codebase are affected (e.g. "Authentication", "Database Layer", "API Gateway", "Frontend — Dashboard")
-- `diff_snippet`: the first 30 lines of the diff hunk for this file (for the diff viewer)
+- `diff_snippet`: the full unified diff for this file (all hunks) — the report UI will fold long diffs behind a "show more" toggle, so include everything
 
 **Test coverage assessment:**
 - Look at which test files changed (`test_files_changed`)
@@ -159,5 +159,5 @@ git commit -m "chore: add PR review report"
 
 - Be honest about risk — it's better to flag something as high risk that turns out to be fine than to miss a real issue
 - When in doubt about what a component does, read 1-2 key files to understand context before classifying
-- The `diff_snippet` should start at the first `@@` hunk header so the diff viewer renders correctly
+- `diff_snippet` should include the full per-file diff (all `@@` hunks) — the UI folds anything beyond 40 lines behind a "show more" button
 - If the diff is huge (>500 files), focus the major/minor classification on the top 20 most significant files and note in the summary that there are more

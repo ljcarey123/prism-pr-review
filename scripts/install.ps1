@@ -17,9 +17,10 @@ $CommandsDir = "$ClaudeDir\commands"
 $HooksDir    = "$ClaudeDir\hooks"
 $SettingsJson = "$ClaudeDir\settings.json"
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
-$PluginCmd   = Join-Path $ScriptDir "..\plugin\commands\review-pr.md"
-$PluginShip  = Join-Path $ScriptDir "..\plugin\commands\ship.md"
-$HookFile    = Join-Path $ScriptDir "..\plugin\hooks\pre-pr-review.md"
+$PluginCmd       = Join-Path $ScriptDir "..\plugin\commands\review-pr.md"
+$PluginShip      = Join-Path $ScriptDir "..\plugin\commands\ship.md"
+$PluginSetupRepo = Join-Path $ScriptDir "..\plugin\commands\setup-repo.md"
+$HookFile        = Join-Path $ScriptDir "..\plugin\hooks\pre-pr-review.md"
 
 function ok($msg)   { Write-Host "  [OK] $msg" -ForegroundColor Green }
 function info($msg) { Write-Host "  --> $msg"  -ForegroundColor Cyan  }
@@ -30,7 +31,7 @@ function err($msg)  { Write-Host "  [ERR] $msg" -ForegroundColor Red; exit 1 }
 if ($Uninstall) {
   info "Uninstalling prism..."
 
-  @("review-pr.md", "ship.md") | ForEach-Object {
+  @("review-pr.md", "ship.md", "setup-repo.md") | ForEach-Object {
     $target = "$CommandsDir\$_"
     if (Test-Path $target) { Remove-Item $target -Force }
   }
@@ -72,9 +73,10 @@ try {
 
 # 1. Install slash commands
 if (-not (Test-Path $CommandsDir)) { New-Item -ItemType Directory -Path $CommandsDir -Force | Out-Null }
-Copy-Item -Path $PluginCmd  -Destination "$CommandsDir\review-pr.md" -Force
-Copy-Item -Path $PluginShip -Destination "$CommandsDir\ship.md" -Force
-ok "Installed /review-pr and /ship commands -> $CommandsDir"
+Copy-Item -Path $PluginCmd       -Destination "$CommandsDir\review-pr.md"   -Force
+Copy-Item -Path $PluginShip      -Destination "$CommandsDir\ship.md"        -Force
+Copy-Item -Path $PluginSetupRepo -Destination "$CommandsDir\setup-repo.md"  -Force
+ok "Installed /review-pr, /ship, and /setup-repo commands -> $CommandsDir"
 
 # 2. Install the pre-PR hook
 if (-not (Test-Path $HooksDir)) { New-Item -ItemType Directory -Path $HooksDir -Force | Out-Null }
@@ -107,13 +109,15 @@ Write-Host ""
 Write-Host "  Commands installed:"
 Write-Host "    /review-pr          -- analyse branch + generate .pr/index.html"
 Write-Host "    /ship [--draft]     -- review + commit + push + open GitHub PR"
+Write-Host "    /setup-repo         -- add prism GitHub Actions workflow to any repo"
 Write-Host ""
 Write-Host "  Hook installed:"
 Write-Host "    Anytime 'gh pr create' runs, Claude will prompt to generate the report first"
 Write-Host ""
 Write-Host "  Next steps:"
 Write-Host "    1. Restart Claude Code (or run /reload)"
-Write-Host "    2. Open any git repo, switch to a feature branch, then run /ship"
+Write-Host "    2. In any git repo, run /setup-repo to enable GitHub integration"
+Write-Host "    3. Switch to a feature branch and run /ship"
 Write-Host ""
 Write-Host "  To uninstall: .\scripts\install.ps1 -Uninstall"
 Write-Host ""

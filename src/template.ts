@@ -233,6 +233,19 @@ export const REPORT_TEMPLATE = `<!DOCTYPE html>
     .dl.rem { color: #f85149; }
     .dl.ctx { color: #8b949e; }
     .dl.hdr { color: #79c0ff; }
+    .diff-more-btn {
+      display: block;
+      margin-top: 8px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: normal;
+    }
+    .diff-more-btn:hover { color: var(--accent); border-color: var(--accent); }
 
     /* ── Components ── */
     .comp-card {
@@ -313,19 +326,31 @@ function typeBadge(t) {
   return \`<span class="type-badge \${t}">\${h(t)}</span>\`;
 }
 
-function renderDiff(snippet) {
+function renderDiff(snippet, cardId) {
   if (!snippet) return '';
-  const lines = snippet.split('\\n').slice(0, 40).map(line => {
-    if (line.startsWith('@@'))       return \`<span class="dl hdr">\${h(line)}</span>\`;
-    if (line.startsWith('+'))        return \`<span class="dl add">\${h(line)}</span>\`;
-    if (line.startsWith('-'))        return \`<span class="dl rem">\${h(line)}</span>\`;
+  const FOLD = 40;
+  const all = snippet.split('\\n');
+  const renderLine = line => {
+    if (line.startsWith('@@'))  return \`<span class="dl hdr">\${h(line)}</span>\`;
+    if (line.startsWith('+'))   return \`<span class="dl add">\${h(line)}</span>\`;
+    if (line.startsWith('-'))   return \`<span class="dl rem">\${h(line)}</span>\`;
     return \`<span class="dl ctx">\${h(line)}</span>\`;
-  }).join('');
-  return \`<div class="diff">\${lines}</div>\`;
+  };
+  const visible = all.slice(0, FOLD).map(renderLine).join('');
+  if (all.length <= FOLD) return \`<div class="diff">\${visible}</div>\`;
+  const hidden  = all.slice(FOLD).map(renderLine).join('');
+  const more    = all.length - FOLD;
+  const moreId  = cardId + '-more';
+  const btnId   = cardId + '-btn';
+  return \`<div class="diff">
+    \${visible}
+    <span id="\${moreId}" style="display:none">\${hidden}</span>
+    <button id="\${btnId}" class="diff-more-btn" onclick="toggleDiff('\${cardId}',\${more})">▼ Show \${more} more lines</button>
+  </div>\`;
 }
 
 function changeCard(c, id) {
-  const diff = c.diff_snippet ? renderDiff(c.diff_snippet) : '';
+  const diff = c.diff_snippet ? renderDiff(c.diff_snippet, id) : '';
   const components = (c.components || []).map(t => \`<span class="tag">\${h(t)}</span>\`).join('');
   return \`
     <div class="change-card" id="cc-\${id}">
@@ -483,6 +508,15 @@ function render() {
 
 function toggle(id) {
   document.getElementById(id)?.classList.toggle('open');
+}
+
+function toggleDiff(cardId, total) {
+  const more = document.getElementById(cardId + '-more');
+  const btn  = document.getElementById(cardId + '-btn');
+  if (!more || !btn) return;
+  const expanded = more.style.display !== 'none';
+  more.style.display = expanded ? 'none' : 'inline';
+  btn.textContent   = expanded ? \`▼ Show \${total} more lines\` : '▲ Show less';
 }
 
 render();
