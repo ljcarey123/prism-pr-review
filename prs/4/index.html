@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PR Review</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #21262d;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --high: #f85149;
+      --high-bg: rgba(248,81,73,0.12);
+      --medium: #d29922;
+      --medium-bg: rgba(210,153,34,0.12);
+      --low: #3fb950;
+      --low-bg: rgba(63,185,80,0.12);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 24px 32px;
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .branch-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .branch-pill {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-family: 'Courier New', monospace;
+      color: var(--accent);
+      font-size: 12px;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 28px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      align-items: center;
+    }
+    .stat { display: flex; flex-direction: column; }
+    .stat-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+    .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
+    .added { color: #3fb950; }
+    .removed { color: #f85149; }
+
+    /* ── Risk badges ── */
+    .risk {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .risk.high   { color: var(--high);   background: var(--high-bg);   border: 1px solid rgba(248,81,73,0.35); }
+    .risk.medium { color: var(--medium); background: var(--medium-bg); border: 1px solid rgba(210,153,34,0.35); }
+    .risk.low    { color: var(--low);    background: var(--low-bg);    border: 1px solid rgba(63,185,80,0.35); }
+
+    /* ── Type badges ── */
+    .type-badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .type-badge.added    { color: #3fb950; background: rgba(63,185,80,0.15); }
+    .type-badge.modified { color: #79c0ff; background: rgba(121,192,255,0.15); }
+    .type-badge.deleted  { color: #f85149; background: rgba(248,81,73,0.15); }
+    .type-badge.renamed  { color: #d29922; background: rgba(210,153,34,0.15); }
+
+    /* ── Nav ── */
+    .nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      display: flex;
+      gap: 2px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    .nav a {
+      padding: 11px 14px;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .nav a:hover { color: var(--text); }
+    .nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    /* ── Main ── */
+    .main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px;
+    }
+    .section { margin-bottom: 44px; }
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .count { background: var(--surface-2); border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--text-muted); }
+    .empty { color: var(--text-muted); font-size: 13px; font-style: italic; }
+
+    /* ── Summary card ── */
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    /* ── Change cards ── */
+    .change-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .change-card:hover { border-color: #484f58; }
+    .change-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .change-file {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .change-desc {
+      color: var(--text-muted);
+      font-size: 13px;
+      flex: 2;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .line-stats { font-size: 12px; font-family: monospace; white-space: nowrap; }
+    .chevron { color: var(--text-muted); font-size: 10px; transition: transform 0.15s; flex-shrink: 0; }
+    .change-card.open .chevron { transform: rotate(90deg); }
+    .change-body {
+      border-top: 1px solid var(--border);
+      padding: 16px;
+      display: none;
+    }
+    .change-card.open .change-body { display: block; }
+    .risk-reason { color: var(--text-muted); font-size: 13px; margin-bottom: 10px; }
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .tag {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ── Diff viewer ── */
+    .diff {
+      background: #0a0d10;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+    .dl { display: block; }
+    .dl.add { color: #3fb950; }
+    .dl.rem { color: #f85149; }
+    .dl.ctx { color: #8b949e; }
+    .dl.hdr { color: #79c0ff; }
+    .diff-more-btn {
+      display: block;
+      margin-top: 8px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: normal;
+    }
+    .diff-more-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Components ── */
+    .comp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 6px;
+      display: grid;
+      grid-template-columns: 180px 1fr auto;
+      gap: 16px;
+      align-items: start;
+    }
+    .comp-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .comp-desc { color: var(--text-muted); font-size: 13px; margin-bottom: 8px; }
+    .comp-files { font-family: monospace; font-size: 12px; color: var(--text-muted); }
+    .comp-file { display: block; padding: 1px 0; }
+
+    /* ── Test coverage ── */
+    .coverage-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .coverage-score {
+      font-size: 28px;
+      font-weight: 700;
+      text-transform: capitalize;
+      margin-bottom: 8px;
+    }
+    .coverage-score.high   { color: var(--low); }
+    .coverage-score.medium { color: var(--medium); }
+    .coverage-score.low    { color: var(--high); }
+    .coverage-score.none   { color: var(--high); }
+    .file-list { margin-top: 14px; }
+    .file-list-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+    .cov-file { font-family: monospace; font-size: 12px; display: block; padding: 2px 0; }
+    .cov-file.fail { color: #f85149; }
+    .cov-file.pass { color: #3fb950; }
+
+    /* ── Commits ── */
+    .commit-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 4px;
+    }
+    .commit-hash { font-family: monospace; font-size: 12px; color: var(--accent); width: 56px; flex-shrink: 0; }
+    .commit-msg  { flex: 1; font-size: 13px; }
+    .commit-meta { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const DATA = {
+  "meta": {
+    "branch": "feature/setup-repo-and-diff-viewer",
+    "target": "master",
+    "generated_at": "2026-03-08T14:00:00Z",
+    "commit_count": 2,
+    "files_changed": 6,
+    "insertions": 303,
+    "deletions": 31
+  },
+  "summary": "Adds a /setup-repo slash command that configures prism's GitHub Actions integration in any target repo — copying the workflow file, verifying Actions permissions, and guiding through the GitHub Pages bootstrap sequence. Also fixes a long-standing bug in install.sh where uninstall removed the MCP entry from the wrong file (mcp.json instead of settings.json), and upgrades the report diff viewer to fold long diffs behind an expandable 'show more' toggle rather than hard-truncating at 40 lines.",
+  "overall_risk": "low",
+  "major_changes": [
+    {
+      "file": "plugin/commands/setup-repo.md",
+      "description": "New /setup-repo slash command: copies pr-report.yml into any repo, checks GitHub Actions status, and guides through Pages bootstrap",
+      "type": "added",
+      "risk": "low",
+      "risk_reason": "New slash command only — no changes to existing behaviour, no security-sensitive code.",
+      "components": ["Plugin Commands"],
+      "lines_added": 188,
+      "lines_removed": 0,
+      "diff_snippet": "diff --git a/plugin/commands/setup-repo.md b/plugin/commands/setup-repo.md\nnew file mode 100644\n--- /dev/null\n+++ b/plugin/commands/setup-repo.md\n@@ -0,0 +1,188 @@\n+---\n+description: \"Set up prism GitHub Actions integration for the current repo\"\n+allowed-tools: [\"Bash\", \"Read\", \"Write\", \"Glob\"]\n+---\n+\n+# Setup Repo — Enable prism GitHub integration\n+\n+Adds the prism Actions workflow to the current repo and walks through GitHub\n+Pages setup so PR report links are automatically posted on every PR.\n+\n+## Step 1 — Check current state\n+Run in parallel: git rev-parse --show-toplevel, git remote get-url origin, gh auth status\n+\n+## Step 2 — Check if workflow already exists\n+Check .github/workflows/pr-report.yml — ask before overwriting.\n+\n+## Step 3 — Copy the workflow file\n+Write the full pr-report.yml workflow, then: git add, commit, push.\n+\n+## Step 4 — Check GitHub Actions is enabled\n+gh api repos/{owner}/{repo}/actions/permissions\n+\n+## Step 5 — Bootstrap GitHub Pages\n+Guide user: run /ship first, then enable Pages in Settings after gh-pages branch exists.\n+\n+## Step 6 — Done\n+Summarise status and remind user to run /ship on next feature branch."
+    },
+    {
+      "file": "src/template.ts",
+      "description": "Diff viewer now folds content beyond 40 lines behind a 'show N more lines' toggle instead of hard-truncating; adds toggleDiff() JS function and button CSS",
+      "type": "modified",
+      "risk": "low",
+      "risk_reason": "Self-contained UI enhancement in the report template; no impact on data or MCP tool behaviour.",
+      "components": ["Report Template"],
+      "lines_added": 44,
+      "lines_removed": 9,
+      "diff_snippet": "diff --git a/src/template.ts b/src/template.ts\n@@ -313,19 +326,31 @@ function typeBadge(t) {\n-function renderDiff(snippet) {\n+function renderDiff(snippet, cardId) {\n   if (!snippet) return '';\n-  const lines = snippet.split('\\n').slice(0, 40).map(line => {\n-    if (line.startsWith('@@'))       return `<span class=\"dl hdr\">${h(line)}</span>`;\n-    if (line.startsWith('+'))        return `<span class=\"dl add\">${h(line)}</span>`;\n-    if (line.startsWith('-'))        return `<span class=\"dl rem\">${h(line)}</span>`;\n+  const FOLD = 40;\n+  const all = snippet.split('\\n');\n+  const renderLine = line => {\n+    if (line.startsWith('@@'))  return `<span class=\"dl hdr\">${h(line)}</span>`;\n+    if (line.startsWith('+'))   return `<span class=\"dl add\">${h(line)}</span>`;\n+    if (line.startsWith('-'))   return `<span class=\"dl rem\">${h(line)}</span>`;\n     return `<span class=\"dl ctx\">${h(line)}</span>`;\n-  }).join('');\n-  return `<div class=\"diff\">${lines}</div>`;\n+  };\n+  const visible = all.slice(0, FOLD).map(renderLine).join('');\n+  if (all.length <= FOLD) return `<div class=\"diff\">${visible}</div>`;\n+  const hidden  = all.slice(FOLD).map(renderLine).join('');\n+  const more    = all.length - FOLD;\n+  return `<div class=\"diff\">\n+    ${visible}\n+    <span id=\"${cardId}-more\" style=\"display:none\">${hidden}</span>\n+    <button id=\"${cardId}-btn\" class=\"diff-more-btn\" onclick=\"toggleDiff('${cardId}',${more})\">▼ Show ${more} more lines</button>\n+  </div>`;\n }\n+\n+function toggleDiff(cardId, total) {\n+  const more = document.getElementById(cardId + '-more');\n+  const btn  = document.getElementById(cardId + '-btn');\n+  if (!more || !btn) return;\n+  const expanded = more.style.display !== 'none';\n+  more.style.display = expanded ? 'none' : 'inline';\n+  btn.textContent   = expanded ? `▼ Show ${total} more lines` : '▲ Show less';\n+}"
+    },
+    {
+      "file": "scripts/install.sh",
+      "description": "Fix uninstall removing MCP entry from mcp.json instead of settings.json; fix header comment; add /setup-repo to install",
+      "type": "modified",
+      "risk": "low",
+      "risk_reason": "Bug fix is in the uninstall path only; install path was already correct. No risk to new installs.",
+      "components": ["Installation"],
+      "lines_added": 18,
+      "lines_removed": 13,
+      "diff_snippet": "diff --git a/scripts/install.sh b/scripts/install.sh\n@@ -17,8 +17,9 @@\n-MCP_JSON=\"${CLAUDE_DIR}/mcp.json\"\n+HOOKS_DIR=\"${CLAUDE_DIR}/hooks\"\n+SETTINGS_JSON=\"${CLAUDE_DIR}/settings.json\"\n+PLUGIN_SETUP_REPO=\"${SCRIPT_DIR}/../plugin/commands/setup-repo.md\"\n \n @@ -48,11 +48,12 @@ if $UNINSTALL; then\n+  rm -f \"${COMMANDS_DIR}/setup-repo.md\"\n-  if [[ -f \"$MCP_JSON\" ]] && command -v node &>/dev/null; then\n+  if [[ -f \"$SETTINGS_JSON\" ]] && command -v node &>/dev/null; then\n-      const cfg = JSON.parse(fs.readFileSync('${MCP_JSON}', 'utf8'));\n+      const cfg = JSON.parse(fs.readFileSync('${SETTINGS_JSON}', 'utf8'));\n-      fs.writeFileSync('${MCP_JSON}', ...);\n+      fs.writeFileSync('${SETTINGS_JSON}', ...);\n-    \" && ok \"Removed prism MCP entry from ~/.claude/mcp.json\"\n+    \" && ok \"Removed prism MCP entry from ~/.claude/settings.json\""
+    }
+  ],
+  "minor_changes": [
+    {
+      "file": "scripts/install.ps1",
+      "description": "Add /setup-repo to install/uninstall lists and update next-steps output",
+      "type": "modified",
+      "risk": "low",
+      "risk_reason": "Additive only — existing install behaviour unchanged.",
+      "components": ["Installation"],
+      "lines_added": 7,
+      "lines_removed": 4
+    },
+    {
+      "file": "plugin/commands/review-pr.md",
+      "description": "Update diff_snippet instruction: include full per-file diff rather than first 30 lines",
+      "type": "modified",
+      "risk": "low",
+      "risk_reason": "Prompt-only change — improves analysis quality, no functional risk.",
+      "components": ["Plugin Commands"],
+      "lines_added": 2,
+      "lines_removed": 2
+    },
+    {
+      "file": "TODO.md",
+      "description": "Add prioritised TODO list covering npm publish, README, large PR handling, report versioning, and babysit-prs command",
+      "type": "added",
+      "risk": "low",
+      "risk_reason": "Documentation only.",
+      "components": ["Documentation"],
+      "lines_added": 42,
+      "lines_removed": 0
+    }
+  ],
+  "impacted_components": [
+    {
+      "name": "Plugin Commands",
+      "files": ["plugin/commands/setup-repo.md", "plugin/commands/review-pr.md"],
+      "risk": "low",
+      "description": "New /setup-repo command handles GitHub integration onboarding. review-pr.md prompt updated for better diff inclusion."
+    },
+    {
+      "name": "Report Template",
+      "files": ["src/template.ts"],
+      "risk": "low",
+      "description": "Diff viewer upgraded from hard-truncation to collapsible fold — reviewers can now see the full diff of any file on demand."
+    },
+    {
+      "name": "Installation",
+      "files": ["scripts/install.sh", "scripts/install.ps1"],
+      "risk": "low",
+      "description": "install.sh uninstall bug fixed (wrong config file path). Both scripts now install /setup-repo and update next-steps guidance."
+    }
+  ],
+  "test_coverage": {
+    "assessment": "none",
+    "notes": "No automated test suite. Changes are: a new slash command (exercised interactively), a template UI change (verified visually), and an install script bug fix (exercised by running the uninstall path).",
+    "untested_files": [],
+    "test_files_changed": []
+  },
+  "commits": [
+    {
+      "hash": "2e18fa9",
+      "message": "docs: add TODO.md with prioritised next steps",
+      "author": "linus",
+      "date": "2026-03-08"
+    },
+    {
+      "hash": "7652ac5",
+      "message": "feat: add /setup-repo command, fix install.sh uninstall bug, expand diff viewer",
+      "author": "linus",
+      "date": "2026-03-08"
+    }
+  ]
+};
+
+const h = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function riskBadge(r) {
+  const icons = { high: '⚠', medium: '~', low: '✓' };
+  const labels = { high: 'HIGH', medium: 'MED', low: 'LOW' };
+  return `<span class="risk ${r}">${icons[r] || ''} ${labels[r] || r}</span>`;
+}
+
+function typeBadge(t) {
+  return `<span class="type-badge ${t}">${h(t)}</span>`;
+}
+
+function renderDiff(snippet, cardId) {
+  if (!snippet) return '';
+  const FOLD = 40;
+  const all = snippet.split('\n');
+  const renderLine = line => {
+    if (line.startsWith('@@'))  return `<span class="dl hdr">${h(line)}</span>`;
+    if (line.startsWith('+'))   return `<span class="dl add">${h(line)}</span>`;
+    if (line.startsWith('-'))   return `<span class="dl rem">${h(line)}</span>`;
+    return `<span class="dl ctx">${h(line)}</span>`;
+  };
+  const visible = all.slice(0, FOLD).map(renderLine).join('');
+  if (all.length <= FOLD) return `<div class="diff">${visible}</div>`;
+  const hidden  = all.slice(FOLD).map(renderLine).join('');
+  const more    = all.length - FOLD;
+  const moreId  = cardId + '-more';
+  const btnId   = cardId + '-btn';
+  return `<div class="diff">
+    ${visible}
+    <span id="${moreId}" style="display:none">${hidden}</span>
+    <button id="${btnId}" class="diff-more-btn" onclick="toggleDiff('${cardId}',${more})">▼ Show ${more} more lines</button>
+  </div>`;
+}
+
+function changeCard(c, id) {
+  const diff = c.diff_snippet ? renderDiff(c.diff_snippet, id) : '';
+  const components = (c.components || []).map(t => `<span class="tag">${h(t)}</span>`).join('');
+  return `
+    <div class="change-card" id="cc-${id}">
+      <div class="change-header" onclick="toggle('cc-${id}')">
+        <span class="chevron">▶</span>
+        ${typeBadge(c.type)}
+        <span class="change-file" title="${h(c.file)}">${h(c.file)}</span>
+        <span class="change-desc" title="${h(c.description)}">${h(c.description)}</span>
+        <span class="line-stats"><span class="added">+${c.lines_added || 0}</span> <span class="removed">-${c.lines_removed || 0}</span></span>
+        ${riskBadge(c.risk)}
+      </div>
+      <div class="change-body">
+        ${c.risk_reason ? `<p class="risk-reason">⚠ ${h(c.risk_reason)}</p>` : ''}
+        ${components ? `<div class="tags">${components}</div>` : ''}
+        ${diff}
+      </div>
+    </div>`;
+}
+
+function render() {
+  const d = DATA;
+  const m = d.meta;
+  const genDate = new Date(m.generated_at).toLocaleString();
+
+  document.getElementById('root').innerHTML = `
+    <div class="header">
+      <h1>PR Review: ${h(m.branch)}</h1>
+      <div class="branch-row">
+        <span class="branch-pill">${h(m.branch)}</span>
+        <span>→</span>
+        <span class="branch-pill">${h(m.target)}</span>
+        <span style="margin-left:8px">Generated ${genDate}</span>
+      </div>
+      <div class="stats-bar">
+        <div class="stat">
+          <span class="stat-value">${m.commit_count}</span>
+          <span class="stat-label">Commits</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">${m.files_changed}</span>
+          <span class="stat-label">Files changed</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value added">+${m.insertions}</span>
+          <span class="stat-label">Insertions</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value removed">-${m.deletions}</span>
+          <span class="stat-label">Deletions</span>
+        </div>
+        <div class="stat" style="margin-left:auto">
+          <span class="stat-value">${riskBadge(d.overall_risk)}</span>
+          <span class="stat-label">Overall risk</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="#summary">Summary</a>
+      <a href="#major">Major (${d.major_changes.length})</a>
+      <a href="#minor">Minor (${d.minor_changes.length})</a>
+      <a href="#components">Components (${d.impacted_components.length})</a>
+      <a href="#coverage">Test coverage</a>
+      <a href="#commits">Commits (${d.commits.length})</a>
+    </nav>
+
+    <div class="main">
+
+      <section class="section" id="summary">
+        <h2 class="section-title">Executive Summary</h2>
+        <div class="summary-card">${h(d.summary)}</div>
+      </section>
+
+      <section class="section" id="major">
+        <h2 class="section-title">Major Changes <span class="count">${d.major_changes.length}</span></h2>
+        ${d.major_changes.length
+          ? d.major_changes.map((c, i) => changeCard(c, 'maj' + i)).join('')
+          : '<p class="empty">No major changes detected.</p>'}
+      </section>
+
+      <section class="section" id="minor">
+        <h2 class="section-title">Minor Changes <span class="count">${d.minor_changes.length}</span></h2>
+        ${d.minor_changes.length
+          ? d.minor_changes.map((c, i) => changeCard(c, 'min' + i)).join('')
+          : '<p class="empty">No minor changes detected.</p>'}
+      </section>
+
+      <section class="section" id="components">
+        <h2 class="section-title">Impacted Components <span class="count">${d.impacted_components.length}</span></h2>
+        ${d.impacted_components.map(comp => `
+          <div class="comp-card">
+            <div>
+              <div class="comp-name">${h(comp.name)}</div>
+              ${riskBadge(comp.risk)}
+            </div>
+            <div>
+              <p class="comp-desc">${h(comp.description)}</p>
+              <div class="comp-files">
+                ${comp.files.map(f => `<span class="comp-file">${h(f)}</span>`).join('')}
+              </div>
+            </div>
+          </div>
+        `).join('') || '<p class="empty">No components identified.</p>'}
+      </section>
+
+      <section class="section" id="coverage">
+        <h2 class="section-title">Test Coverage</h2>
+        <div class="coverage-card">
+          <div class="coverage-score ${d.test_coverage.assessment}">${d.test_coverage.assessment} coverage</div>
+          <p style="color:var(--text-muted);font-size:13px">${h(d.test_coverage.notes)}</p>
+          ${d.test_coverage.untested_files?.length ? `
+            <div class="file-list">
+              <div class="file-list-label">Missing test coverage</div>
+              ${d.test_coverage.untested_files.map(f => `<span class="cov-file fail">✗ ${h(f)}</span>`).join('')}
+            </div>` : ''}
+          ${d.test_coverage.test_files_changed?.length ? `
+            <div class="file-list" style="margin-top:12px">
+              <div class="file-list-label">Test files modified</div>
+              ${d.test_coverage.test_files_changed.map(f => `<span class="cov-file pass">✓ ${h(f)}</span>`).join('')}
+            </div>` : ''}
+        </div>
+      </section>
+
+      <section class="section" id="commits">
+        <h2 class="section-title">Commits <span class="count">${d.commits.length}</span></h2>
+        ${d.commits.map(c => `
+          <div class="commit-item">
+            <span class="commit-hash">${h(String(c.hash).substring(0, 7))}</span>
+            <span class="commit-msg">${h(c.message)}</span>
+            <span class="commit-meta">${h(c.author)} · ${h(c.date)}</span>
+          </div>
+        `).join('')}
+      </section>
+
+    </div>
+  `;
+
+  // Highlight active nav link on scroll
+  const sections = ['summary','major','minor','components','coverage','commits'];
+  const navLinks = document.querySelectorAll('.nav a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const link = document.querySelector(`.nav a[href="#${e.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+}
+
+function toggle(id) {
+  document.getElementById(id)?.classList.toggle('open');
+}
+
+function toggleDiff(cardId, total) {
+  const more = document.getElementById(cardId + '-more');
+  const btn  = document.getElementById(cardId + '-btn');
+  if (!more || !btn) return;
+  const expanded = more.style.display !== 'none';
+  more.style.display = expanded ? 'none' : 'inline';
+  btn.textContent   = expanded ? `▼ Show ${total} more lines` : '▲ Show less';
+}
+
+render();
+</script>
+</body>
+</html>
