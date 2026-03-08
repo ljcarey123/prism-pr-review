@@ -15,7 +15,7 @@ $ErrorActionPreference = 'Stop'
 $ClaudeDir   = "$env:USERPROFILE\.claude"
 $CommandsDir = "$ClaudeDir\commands"
 $HooksDir    = "$ClaudeDir\hooks"
-$McpJson     = "$ClaudeDir\mcp.json"
+$SettingsJson = "$ClaudeDir\settings.json"
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PluginCmd   = Join-Path $ScriptDir "..\plugin\commands\review-pr.md"
 $PluginShip  = Join-Path $ScriptDir "..\plugin\commands\ship.md"
@@ -39,12 +39,12 @@ if ($Uninstall) {
   }
   ok "Removed prism commands and hooks"
 
-  if (Test-Path $McpJson) {
-    $cfg = Get-Content $McpJson -Raw | ConvertFrom-Json
+  if (Test-Path $SettingsJson) {
+    $cfg = Get-Content $SettingsJson -Raw | ConvertFrom-Json
     if ($cfg.mcpServers.PSObject.Properties['prism']) {
       $cfg.mcpServers.PSObject.Properties.Remove('prism')
-      $cfg | ConvertTo-Json -Depth 10 | Set-Content $McpJson -Encoding UTF8
-      ok "Removed prism MCP entry from ~/.claude/mcp.json"
+      $cfg | ConvertTo-Json -Depth 10 | Set-Content $SettingsJson -Encoding UTF8
+      ok "Removed prism MCP entry from ~/.claude/settings.json"
     }
   }
 
@@ -81,14 +81,14 @@ if (-not (Test-Path $HooksDir)) { New-Item -ItemType Directory -Path $HooksDir -
 Copy-Item -Path $HookFile -Destination "$HooksDir\pre-pr-review.md" -Force
 ok "Installed pre-PR hook -> $HooksDir\pre-pr-review.md"
 
-# 3. Wire up MCP server
+# 3. Wire up MCP server in ~/.claude/settings.json
 $mcpEntry = @{
   command = "npx"
   args    = @("-y", "prism-pr-review")
 }
 
-if (Test-Path $McpJson) {
-  $cfg = Get-Content $McpJson -Raw | ConvertFrom-Json
+if (Test-Path $SettingsJson) {
+  $cfg = Get-Content $SettingsJson -Raw | ConvertFrom-Json
 } else {
   $cfg = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} }
 }
@@ -98,8 +98,8 @@ if (-not $cfg.PSObject.Properties['mcpServers']) {
 }
 $cfg.mcpServers | Add-Member -MemberType NoteProperty -Name 'prism' -Value $mcpEntry -Force
 
-$cfg | ConvertTo-Json -Depth 10 | Set-Content $McpJson -Encoding UTF8
-ok "Registered prism MCP server in ~/.claude/mcp.json"
+$cfg | ConvertTo-Json -Depth 10 | Set-Content $SettingsJson -Encoding UTF8
+ok "Registered prism MCP server in ~/.claude/settings.json"
 
 Write-Host ""
 ok "Installation complete!"
