@@ -93,25 +93,25 @@ mkdir -p "$HOOKS_DIR"
 cp "$HOOK_FILE" "${HOOKS_DIR}/pre-pr-review.md"
 ok "Installed pre-PR hook → ~/.claude/hooks/pre-pr-review.md"
 
-# 3. Wire up the MCP server in ~/.claude/mcp.json
+# 3. Wire up the MCP server in ~/.claude/settings.json
 MCP_ENTRY='{"command":"npx","args":["-y","prism-pr-review"]}'
 
-if [[ -f "$MCP_JSON" ]]; then
+if [[ -f "$SETTINGS_JSON" ]]; then
   node -e "
     const fs = require('fs');
-    const cfg = JSON.parse(fs.readFileSync('${MCP_JSON}', 'utf8'));
+    const cfg = JSON.parse(fs.readFileSync('${SETTINGS_JSON}', 'utf8'));
     cfg.mcpServers = cfg.mcpServers || {};
     cfg.mcpServers.prism = ${MCP_ENTRY};
-    fs.writeFileSync('${MCP_JSON}', JSON.stringify(cfg, null, 2) + '\n');
+    fs.writeFileSync('${SETTINGS_JSON}', JSON.stringify(cfg, null, 2) + '\n');
   "
 else
   printf '{"mcpServers":{"prism":%s}}\n' "$MCP_ENTRY" \
     | node -e "
         const d = require('fs').readFileSync('/dev/stdin','utf8');
         process.stdout.write(JSON.stringify(JSON.parse(d), null, 2) + '\n');
-      " > "$MCP_JSON"
+      " > "$SETTINGS_JSON"
 fi
-ok "Registered prism MCP server in ~/.claude/mcp.json"
+ok "Registered prism MCP server in ~/.claude/settings.json"
 
 echo ""
 ok "Installation complete!"
