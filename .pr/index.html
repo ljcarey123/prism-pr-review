@@ -295,7 +295,48 @@
 <body>
 <div id="root"></div>
 <script>
-const DATA = {"meta":{"branch":"feature/add-github-pr-support","target":"master","generated_at":"2026-03-08T21:16:20.755Z","commit_count":2,"files_changed":5,"insertions":73,"deletions":16},"summary":"This PR sets up the prism repository with essential housekeeping: a CLAUDE.md developer guide, .gitattributes for consistent line endings, and a project-local .mcp.json so the MCP server auto-connects when the repo is opened. It also fixes a critical bug in both install scripts where the MCP config was being written to ~/.claude/mcp.json instead of ~/.claude/settings.json — the path Claude Code actually reads.","overall_risk":"low","major_changes":[{"file":"CLAUDE.md","description":"Adds Claude Code developer guide documenting repo structure, key files, dev workflow, and coding conventions","type":"added","risk":"low","risk_reason":"Pure documentation — no executable code, no security impact.","components":["Developer Documentation"],"lines_added":45,"lines_removed":0,"diff_snippet":"diff --git a/CLAUDE.md b/CLAUDE.md\nnew file mode 100644\n--- /dev/null\n+++ b/CLAUDE.md\n@@ -0,0 +1,45 @@\n+# prism — CLAUDE.md\n+\n+## What this repo is\n+\n+prism is a Claude Code plugin that generates interactive PR review reports. It has two parts:\n+- **MCP server** (`src/`) — Node.js process exposing `get_pr_data` and `generate_report` tools\n+- **Claude Code plugin** (`plugin/`) — slash commands and hooks that orchestrate the review workflow"},{"file":"scripts/install.ps1","description":"Fixes MCP server registration to write to ~/.claude/settings.json instead of the non-functional ~/.claude/mcp.json","type":"modified","risk":"medium","risk_reason":"Behaviour-changing fix to the install script — wrong target file would silently break MCP connectivity for all Windows users.","components":["Installation & Setup"],"lines_added":10,"lines_removed":10,"diff_snippet":"diff --git a/scripts/install.ps1 b/scripts/install.ps1\n@@ -15,7 +15,7 @@\n $ClaudeDir   = \"$env:USERPROFILE.claude\"\n $CommandsDir = \"$ClaudeDircommands\"\n $HooksDir    = \"$ClaudeDirhooks\"\n-$McpJson     = \"$ClaudeDirmcp.json\"\n+$SettingsJson = \"$ClaudeDirsettings.json\"\n $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path"},{"file":"scripts/install.sh","description":"Same settings.json fix applied to the Unix/macOS install script","type":"modified","risk":"medium","risk_reason":"Same silent breakage risk as install.ps1 — wrong config path would leave MCP disconnected after install on Mac/Linux.","components":["Installation & Setup"],"lines_added":6,"lines_removed":6,"diff_snippet":"diff --git a/scripts/install.sh b/scripts/install.sh\n@@ -88,10 +88,10 @@\n-# 3. Wire up the MCP server in ~/.claude/mcp.json\n+# 3. Wire up the MCP server in ~/.claude/settings.json\n MCP_ENTRY='{\"command\":\"npx\",\"args\":[\"-y\",\"prism-pr-review\"]}'\n \n-if [[ -f \"$MCP_JSON\" ]]; then\n+if [[ -f \"$SETTINGS_JSON\" ]]; then"}],"minor_changes":[{"file":".gitattributes","description":"Normalises line endings to LF in the repo, with native CRLF checkout for .ps1 files on Windows","type":"added","risk":"low","risk_reason":"Standard config — minimal risk, though team members may see re-normalisation noise on first checkout after merge.","components":["Repository Configuration"],"lines_added":4,"lines_removed":0},{"file":".mcp.json","description":"Adds project-local Claude Code MCP configuration so the prism server auto-connects when the repo is opened","type":"added","risk":"low","risk_reason":"Convenience config only — no security or functional risk, uses npx for clean isolation.","components":["Installation & Setup"],"lines_added":8,"lines_removed":0}],"impacted_components":[{"name":"Installation & Setup","files":["scripts/install.ps1","scripts/install.sh",".mcp.json"],"risk":"medium","description":"The install scripts are the primary onboarding path for new users. The settings.json fix is critical — without it the MCP server silently fails to connect after install."},{"name":"Developer Documentation","files":["CLAUDE.md"],"risk":"low","description":"CLAUDE.md shapes how Claude Code behaves in this repo across all sessions. Incorrect guidance could lead to inconsistent behaviour."},{"name":"Repository Configuration","files":[".gitattributes"],"risk":"low","description":"Controls how Git normalises line endings across platforms."}],"test_coverage":{"assessment":"none","test_files_changed":[],"untested_files":[],"notes":"No test suite exists in this repo yet. All changed files are configuration, documentation, and shell scripts — not application logic. The install scripts themselves are the primary candidates for future integration tests."},"commits":[{"hash":"8f69a983b9ea2e58d82f9ea727355f9915c4c90f","message":"feat: add .mcp.json and fix install scripts to use settings.json","author":"linus","date":"2026-03-08"},{"hash":"f86cf86cc28a171420a6c89e4e6be67865b01a05","message":"feat: add CLAUDE.md and .gitattributes","author":"linus","date":"2026-03-08"}]};
+const DATA = {
+  "title": "Update workflow: only deploy report if generated in this PR",
+  "branch": "feature/update-workflow-freshness-check",
+  "target": "master",
+  "date": "2026-03-08",
+  "summary": "Improves the PR report deployment workflow so it only publishes the interactive report link when .pr/index.html was actually committed as part of the current PR's changes (via /ship). Previously, a stale report from a prior branch state could trigger a false positive deploy. Now uses git diff between base and head SHAs to verify freshness. When no fresh report is found, posts a helpful warning comment with instructions to run /ship and a note that GitHub Actions must be enabled.",
+  "overall_risk": "low",
+  "major_changes": [
+    {
+      "file": ".github/workflows/pr-report.yml",
+      "description": "Replace file-existence check with git diff freshness check between base and head SHAs. Add second comment path for missing/stale reports with /ship instructions and GitHub Actions enablement warning.",
+      "risk": "low",
+      "change_type": "modified",
+      "diff": "fetch-depth: 0 added to checkout; check step now uses git diff --name-only base..head | grep .pr/index.html; output var renamed exists→fresh; new step posts warning comment when fresh=false"
+    }
+  ],
+  "minor_changes": [],
+  "impacted_components": [
+    {
+      "name": "CI/CD Workflow",
+      "description": "GitHub Actions deployment pipeline for prism PR reports"
+    }
+  ],
+  "test_coverage": {
+    "assessment": "untested",
+    "notes": "CI/CD workflow changes are validated when the PR is opened on GitHub — the Actions run will exercise both the fresh=true and fresh=false code paths depending on whether .pr/index.html is in the diff.",
+    "untested_files": []
+  },
+  "commits": [
+    {
+      "hash": "0ae176f",
+      "message": "feat: only deploy report if generated in this PR, add stale/missing warning",
+      "author": "linus",
+      "date": "2026-03-08"
+    }
+  ],
+  "stats": {
+    "files_changed": 1,
+    "insertions": 32,
+    "deletions": 9
+  }
+};
 
 const h = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
