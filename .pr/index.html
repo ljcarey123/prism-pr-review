@@ -229,6 +229,19 @@
     .dl.rem { color: #f85149; }
     .dl.ctx { color: #8b949e; }
     .dl.hdr { color: #79c0ff; }
+    .diff-more-btn {
+      display: block;
+      margin-top: 8px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: normal;
+    }
+    .diff-more-btn:hover { color: var(--accent); border-color: var(--accent); }
 
     /* ── Components ── */
     .comp-card {
@@ -297,71 +310,119 @@
 <script>
 const DATA = {
   "meta": {
-    "branch": "feature/update-workflow-freshness-check",
+    "branch": "feature/setup-repo-and-diff-viewer",
     "target": "master",
-    "generated_at": "2026-03-08T12:30:00Z",
-    "commit_count": 3,
-    "files_changed": 2,
-    "insertions": 81,
-    "deletions": 10
+    "generated_at": "2026-03-08T14:00:00Z",
+    "commit_count": 2,
+    "files_changed": 6,
+    "insertions": 303,
+    "deletions": 31
   },
-  "summary": "Tightens the GitHub Actions PR report workflow so the interactive report link is only published when .pr/index.html was committed as part of the current PR (via /ship), not just when the file exists anywhere in the branch. Uses git diff between base and head SHAs to verify freshness. When no fresh report is found, a warning comment is posted on the PR with instructions to run /ship and a note that GitHub Actions must be enabled on the repo.",
+  "summary": "Adds a /setup-repo slash command that configures prism's GitHub Actions integration in any target repo — copying the workflow file, verifying Actions permissions, and guiding through the GitHub Pages bootstrap sequence. Also fixes a long-standing bug in install.sh where uninstall removed the MCP entry from the wrong file (mcp.json instead of settings.json), and upgrades the report diff viewer to fold long diffs behind an expandable 'show more' toggle rather than hard-truncating at 40 lines.",
   "overall_risk": "low",
   "major_changes": [
     {
-      "file": ".github/workflows/pr-report.yml",
-      "description": "Replace stale file-existence check with git diff freshness check; add warning comment step for PRs missing a fresh report",
+      "file": "plugin/commands/setup-repo.md",
+      "description": "New /setup-repo slash command: copies pr-report.yml into any repo, checks GitHub Actions status, and guides through Pages bootstrap",
+      "type": "added",
+      "risk": "low",
+      "risk_reason": "New slash command only — no changes to existing behaviour, no security-sensitive code.",
+      "components": ["Plugin Commands"],
+      "lines_added": 188,
+      "lines_removed": 0,
+      "diff_snippet": "diff --git a/plugin/commands/setup-repo.md b/plugin/commands/setup-repo.md\nnew file mode 100644\n--- /dev/null\n+++ b/plugin/commands/setup-repo.md\n@@ -0,0 +1,188 @@\n+---\n+description: \"Set up prism GitHub Actions integration for the current repo\"\n+allowed-tools: [\"Bash\", \"Read\", \"Write\", \"Glob\"]\n+---\n+\n+# Setup Repo — Enable prism GitHub integration\n+\n+Adds the prism Actions workflow to the current repo and walks through GitHub\n+Pages setup so PR report links are automatically posted on every PR.\n+\n+## Step 1 — Check current state\n+Run in parallel: git rev-parse --show-toplevel, git remote get-url origin, gh auth status\n+\n+## Step 2 — Check if workflow already exists\n+Check .github/workflows/pr-report.yml — ask before overwriting.\n+\n+## Step 3 — Copy the workflow file\n+Write the full pr-report.yml workflow, then: git add, commit, push.\n+\n+## Step 4 — Check GitHub Actions is enabled\n+gh api repos/{owner}/{repo}/actions/permissions\n+\n+## Step 5 — Bootstrap GitHub Pages\n+Guide user: run /ship first, then enable Pages in Settings after gh-pages branch exists.\n+\n+## Step 6 — Done\n+Summarise status and remind user to run /ship on next feature branch."
+    },
+    {
+      "file": "src/template.ts",
+      "description": "Diff viewer now folds content beyond 40 lines behind a 'show N more lines' toggle instead of hard-truncating; adds toggleDiff() JS function and button CSS",
       "type": "modified",
       "risk": "low",
-      "risk_reason": "CI/CD-only change with no impact on application code; worst case is a missed or extra PR comment.",
-      "components": ["CI/CD"],
-      "lines_added": 41,
+      "risk_reason": "Self-contained UI enhancement in the report template; no impact on data or MCP tool behaviour.",
+      "components": ["Report Template"],
+      "lines_added": 44,
       "lines_removed": 9,
-      "diff_snippet": "diff --git a/.github/workflows/pr-report.yml b/.github/workflows/pr-report.yml\n@@ -14,20 +14,23 @@ jobs:\n     steps:\n       - name: Checkout PR branch\n         uses: actions/checkout@v4\n+        with:\n+          fetch-depth: 0   # need full history to diff base..head\n \n-      - name: Check report exists\n+      - name: Check report is up-to-date for this PR\n         id: check\n+        env:\n+          BASE_SHA: ${{ github.event.pull_request.base.sha }}\n+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}\n         run: |\n-          if [ -f \".pr/index.html\" ]; then\n-            echo \"exists=true\" >> $GITHUB_OUTPUT\n+          if git diff --name-only \"$BASE_SHA\" \"$HEAD_SHA\" | grep -q \"^\\.pr/index\\.html$\"; then\n+            echo \"fresh=true\" >> $GITHUB_OUTPUT\n           else\n-            echo \"exists=false\" >> $GITHUB_OUTPUT\n+            echo \"fresh=false\" >> $GITHUB_OUTPUT\n           fi"
+      "diff_snippet": "diff --git a/src/template.ts b/src/template.ts\n@@ -313,19 +326,31 @@ function typeBadge(t) {\n-function renderDiff(snippet) {\n+function renderDiff(snippet, cardId) {\n   if (!snippet) return '';\n-  const lines = snippet.split('\\n').slice(0, 40).map(line => {\n-    if (line.startsWith('@@'))       return `<span class=\"dl hdr\">${h(line)}</span>`;\n-    if (line.startsWith('+'))        return `<span class=\"dl add\">${h(line)}</span>`;\n-    if (line.startsWith('-'))        return `<span class=\"dl rem\">${h(line)}</span>`;\n+  const FOLD = 40;\n+  const all = snippet.split('\\n');\n+  const renderLine = line => {\n+    if (line.startsWith('@@'))  return `<span class=\"dl hdr\">${h(line)}</span>`;\n+    if (line.startsWith('+'))   return `<span class=\"dl add\">${h(line)}</span>`;\n+    if (line.startsWith('-'))   return `<span class=\"dl rem\">${h(line)}</span>`;\n     return `<span class=\"dl ctx\">${h(line)}</span>`;\n-  }).join('');\n-  return `<div class=\"diff\">${lines}</div>`;\n+  };\n+  const visible = all.slice(0, FOLD).map(renderLine).join('');\n+  if (all.length <= FOLD) return `<div class=\"diff\">${visible}</div>`;\n+  const hidden  = all.slice(FOLD).map(renderLine).join('');\n+  const more    = all.length - FOLD;\n+  return `<div class=\"diff\">\n+    ${visible}\n+    <span id=\"${cardId}-more\" style=\"display:none\">${hidden}</span>\n+    <button id=\"${cardId}-btn\" class=\"diff-more-btn\" onclick=\"toggleDiff('${cardId}',${more})\">▼ Show ${more} more lines</button>\n+  </div>`;\n }\n+\n+function toggleDiff(cardId, total) {\n+  const more = document.getElementById(cardId + '-more');\n+  const btn  = document.getElementById(cardId + '-btn');\n+  if (!more || !btn) return;\n+  const expanded = more.style.display !== 'none';\n+  more.style.display = expanded ? 'none' : 'inline';\n+  btn.textContent   = expanded ? `▼ Show ${total} more lines` : '▲ Show less';\n+}"
+    },
+    {
+      "file": "scripts/install.sh",
+      "description": "Fix uninstall removing MCP entry from mcp.json instead of settings.json; fix header comment; add /setup-repo to install",
+      "type": "modified",
+      "risk": "low",
+      "risk_reason": "Bug fix is in the uninstall path only; install path was already correct. No risk to new installs.",
+      "components": ["Installation"],
+      "lines_added": 18,
+      "lines_removed": 13,
+      "diff_snippet": "diff --git a/scripts/install.sh b/scripts/install.sh\n@@ -17,8 +17,9 @@\n-MCP_JSON=\"${CLAUDE_DIR}/mcp.json\"\n+HOOKS_DIR=\"${CLAUDE_DIR}/hooks\"\n+SETTINGS_JSON=\"${CLAUDE_DIR}/settings.json\"\n+PLUGIN_SETUP_REPO=\"${SCRIPT_DIR}/../plugin/commands/setup-repo.md\"\n \n @@ -48,11 +48,12 @@ if $UNINSTALL; then\n+  rm -f \"${COMMANDS_DIR}/setup-repo.md\"\n-  if [[ -f \"$MCP_JSON\" ]] && command -v node &>/dev/null; then\n+  if [[ -f \"$SETTINGS_JSON\" ]] && command -v node &>/dev/null; then\n-      const cfg = JSON.parse(fs.readFileSync('${MCP_JSON}', 'utf8'));\n+      const cfg = JSON.parse(fs.readFileSync('${SETTINGS_JSON}', 'utf8'));\n-      fs.writeFileSync('${MCP_JSON}', ...);\n+      fs.writeFileSync('${SETTINGS_JSON}', ...);\n-    \" && ok \"Removed prism MCP entry from ~/.claude/mcp.json\"\n+    \" && ok \"Removed prism MCP entry from ~/.claude/settings.json\""
     }
   ],
   "minor_changes": [
     {
-      "file": ".pr/index.html",
-      "description": "Updated PR review report artifact (generated by /ship)",
+      "file": "scripts/install.ps1",
+      "description": "Add /setup-repo to install/uninstall lists and update next-steps output",
       "type": "modified",
       "risk": "low",
-      "risk_reason": "Auto-generated artifact — not hand-authored code.",
-      "components": ["CI/CD"],
-      "lines_added": 50,
-      "lines_removed": 1
+      "risk_reason": "Additive only — existing install behaviour unchanged.",
+      "components": ["Installation"],
+      "lines_added": 7,
+      "lines_removed": 4
+    },
+    {
+      "file": "plugin/commands/review-pr.md",
+      "description": "Update diff_snippet instruction: include full per-file diff rather than first 30 lines",
+      "type": "modified",
+      "risk": "low",
+      "risk_reason": "Prompt-only change — improves analysis quality, no functional risk.",
+      "components": ["Plugin Commands"],
+      "lines_added": 2,
+      "lines_removed": 2
+    },
+    {
+      "file": "TODO.md",
+      "description": "Add prioritised TODO list covering npm publish, README, large PR handling, report versioning, and babysit-prs command",
+      "type": "added",
+      "risk": "low",
+      "risk_reason": "Documentation only.",
+      "components": ["Documentation"],
+      "lines_added": 42,
+      "lines_removed": 0
     }
   ],
   "impacted_components": [
     {
-      "name": "CI/CD Workflow",
-      "files": [".github/workflows/pr-report.yml"],
+      "name": "Plugin Commands",
+      "files": ["plugin/commands/setup-repo.md", "plugin/commands/review-pr.md"],
       "risk": "low",
-      "description": "GitHub Actions pipeline that deploys prism PR reports to GitHub Pages and posts PR comments. Change ensures reports are only surfaced when freshly generated for the current PR."
+      "description": "New /setup-repo command handles GitHub integration onboarding. review-pr.md prompt updated for better diff inclusion."
+    },
+    {
+      "name": "Report Template",
+      "files": ["src/template.ts"],
+      "risk": "low",
+      "description": "Diff viewer upgraded from hard-truncation to collapsible fold — reviewers can now see the full diff of any file on demand."
+    },
+    {
+      "name": "Installation",
+      "files": ["scripts/install.sh", "scripts/install.ps1"],
+      "risk": "low",
+      "description": "install.sh uninstall bug fixed (wrong config file path). Both scripts now install /setup-repo and update next-steps guidance."
     }
   ],
   "test_coverage": {
     "assessment": "none",
-    "notes": "No automated tests — CI/CD workflow changes are exercised when the PR is opened on GitHub. Both the fresh=true and fresh=false paths will be validated by the Actions run on this PR itself.",
+    "notes": "No automated test suite. Changes are: a new slash command (exercised interactively), a template UI change (verified visually), and an install script bug fix (exercised by running the uninstall path).",
     "untested_files": [],
     "test_files_changed": []
   },
   "commits": [
     {
-      "hash": "2d87f8f",
-      "message": "chore: fix PR review report (correct PRAnalysis schema)",
+      "hash": "2e18fa9",
+      "message": "docs: add TODO.md with prioritised next steps",
       "author": "linus",
       "date": "2026-03-08"
     },
     {
-      "hash": "a544c1e",
-      "message": "chore: add PR review report",
-      "author": "linus",
-      "date": "2026-03-08"
-    },
-    {
-      "hash": "0ae176f",
-      "message": "feat: only deploy report if generated in this PR, add stale/missing warning",
+      "hash": "7652ac5",
+      "message": "feat: add /setup-repo command, fix install.sh uninstall bug, expand diff viewer",
       "author": "linus",
       "date": "2026-03-08"
     }
@@ -380,19 +441,31 @@ function typeBadge(t) {
   return `<span class="type-badge ${t}">${h(t)}</span>`;
 }
 
-function renderDiff(snippet) {
+function renderDiff(snippet, cardId) {
   if (!snippet) return '';
-  const lines = snippet.split('\n').slice(0, 40).map(line => {
-    if (line.startsWith('@@'))       return `<span class="dl hdr">${h(line)}</span>`;
-    if (line.startsWith('+'))        return `<span class="dl add">${h(line)}</span>`;
-    if (line.startsWith('-'))        return `<span class="dl rem">${h(line)}</span>`;
+  const FOLD = 40;
+  const all = snippet.split('\n');
+  const renderLine = line => {
+    if (line.startsWith('@@'))  return `<span class="dl hdr">${h(line)}</span>`;
+    if (line.startsWith('+'))   return `<span class="dl add">${h(line)}</span>`;
+    if (line.startsWith('-'))   return `<span class="dl rem">${h(line)}</span>`;
     return `<span class="dl ctx">${h(line)}</span>`;
-  }).join('');
-  return `<div class="diff">${lines}</div>`;
+  };
+  const visible = all.slice(0, FOLD).map(renderLine).join('');
+  if (all.length <= FOLD) return `<div class="diff">${visible}</div>`;
+  const hidden  = all.slice(FOLD).map(renderLine).join('');
+  const more    = all.length - FOLD;
+  const moreId  = cardId + '-more';
+  const btnId   = cardId + '-btn';
+  return `<div class="diff">
+    ${visible}
+    <span id="${moreId}" style="display:none">${hidden}</span>
+    <button id="${btnId}" class="diff-more-btn" onclick="toggleDiff('${cardId}',${more})">▼ Show ${more} more lines</button>
+  </div>`;
 }
 
 function changeCard(c, id) {
-  const diff = c.diff_snippet ? renderDiff(c.diff_snippet) : '';
+  const diff = c.diff_snippet ? renderDiff(c.diff_snippet, id) : '';
   const components = (c.components || []).map(t => `<span class="tag">${h(t)}</span>`).join('');
   return `
     <div class="change-card" id="cc-${id}">
@@ -550,6 +623,15 @@ function render() {
 
 function toggle(id) {
   document.getElementById(id)?.classList.toggle('open');
+}
+
+function toggleDiff(cardId, total) {
+  const more = document.getElementById(cardId + '-more');
+  const btn  = document.getElementById(cardId + '-btn');
+  if (!more || !btn) return;
+  const expanded = more.style.display !== 'none';
+  more.style.display = expanded ? 'none' : 'inline';
+  btn.textContent   = expanded ? `▼ Show ${total} more lines` : '▲ Show less';
 }
 
 render();

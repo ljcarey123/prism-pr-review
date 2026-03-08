@@ -8,8 +8,8 @@
 # What it does:
 #   1. Copies plugin/commands/review-pr.md → ~/.claude/commands/review-pr.md
 #   2. Copies plugin/commands/ship.md       → ~/.claude/commands/ship.md
-#   3. Adds the prism MCP server to ~/.claude/mcp.json
-#   4. Registers the pre-PR hook in ~/.claude/settings.json
+#   3. Copies plugin/hooks/pre-pr-review.md → ~/.claude/hooks/pre-pr-review.md
+#   4. Registers the prism MCP server in ~/.claude/settings.json
 #
 # After running, restart Claude Code and use /review-pr or /ship in any git repo.
 
@@ -17,13 +17,13 @@ set -euo pipefail
 
 CLAUDE_DIR="${HOME}/.claude"
 COMMANDS_DIR="${CLAUDE_DIR}/commands"
-MCP_JSON="${CLAUDE_DIR}/mcp.json"
+HOOKS_DIR="${CLAUDE_DIR}/hooks"
+SETTINGS_JSON="${CLAUDE_DIR}/settings.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_CMD="${SCRIPT_DIR}/../plugin/commands/review-pr.md"
 PLUGIN_SHIP="${SCRIPT_DIR}/../plugin/commands/ship.md"
+PLUGIN_SETUP_REPO="${SCRIPT_DIR}/../plugin/commands/setup-repo.md"
 HOOK_FILE="${SCRIPT_DIR}/../plugin/hooks/pre-pr-review.md"
-HOOKS_DIR="${CLAUDE_DIR}/hooks"
-SETTINGS_JSON="${CLAUDE_DIR}/settings.json"
 
 UNINSTALL=false
 if [[ "${1:-}" == "--uninstall" ]]; then
@@ -48,16 +48,17 @@ if $UNINSTALL; then
 
   rm -f "${COMMANDS_DIR}/review-pr.md"
   rm -f "${COMMANDS_DIR}/ship.md"
+  rm -f "${COMMANDS_DIR}/setup-repo.md"
   rm -f "${HOOKS_DIR}/pre-pr-review.md"
   ok "Removed prism commands and hooks"
 
-  if [[ -f "$MCP_JSON" ]] && command -v node &>/dev/null; then
+  if [[ -f "$SETTINGS_JSON" ]] && command -v node &>/dev/null; then
     node -e "
       const fs = require('fs');
-      const cfg = JSON.parse(fs.readFileSync('${MCP_JSON}', 'utf8'));
+      const cfg = JSON.parse(fs.readFileSync('${SETTINGS_JSON}', 'utf8'));
       delete (cfg.mcpServers || {}).prism;
-      fs.writeFileSync('${MCP_JSON}', JSON.stringify(cfg, null, 2) + '\n');
-    " && ok "Removed prism MCP entry from ~/.claude/mcp.json"
+      fs.writeFileSync('${SETTINGS_JSON}', JSON.stringify(cfg, null, 2) + '\n');
+    " && ok "Removed prism MCP entry from ~/.claude/settings.json"
   fi
 
   echo ""
@@ -84,9 +85,10 @@ ok "Node.js $(node --version) detected"
 
 # 1. Install slash commands
 mkdir -p "$COMMANDS_DIR"
-cp "$PLUGIN_CMD"  "${COMMANDS_DIR}/review-pr.md"
-cp "$PLUGIN_SHIP" "${COMMANDS_DIR}/ship.md"
-ok "Installed /review-pr and /ship commands → ~/.claude/commands/"
+cp "$PLUGIN_CMD"        "${COMMANDS_DIR}/review-pr.md"
+cp "$PLUGIN_SHIP"       "${COMMANDS_DIR}/ship.md"
+cp "$PLUGIN_SETUP_REPO" "${COMMANDS_DIR}/setup-repo.md"
+ok "Installed /review-pr, /ship, and /setup-repo commands → ~/.claude/commands/"
 
 # 2. Install the pre-PR hook
 mkdir -p "$HOOKS_DIR"
@@ -119,13 +121,15 @@ echo ""
 echo "  Commands installed:"
 echo "    /review-pr          — analyse branch + generate .pr/index.html"
 echo "    /ship [--draft]     — review + commit + push + open GitHub PR"
+echo "    /setup-repo         — add prism GitHub Actions workflow to any repo"
 echo ""
 echo "  Hook installed:"
 echo "    Anytime 'gh pr create' runs, Claude will prompt to generate the report first"
 echo ""
 echo "  Next steps:"
 echo "    1. Restart Claude Code (or run /reload)"
-echo "    2. Open any git repo, switch to a feature branch, then run /ship"
+echo "    2. In any git repo, run /setup-repo to enable GitHub integration"
+echo "    3. Switch to a feature branch and run /ship"
 echo ""
 echo "  To uninstall: bash scripts/install.sh --uninstall"
 echo ""
