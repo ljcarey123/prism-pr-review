@@ -296,32 +296,44 @@
 <div id="root"></div>
 <script>
 const DATA = {
-  "title": "Update workflow: only deploy report if generated in this PR",
-  "branch": "feature/update-workflow-freshness-check",
-  "target": "master",
-  "date": "2026-03-08",
-  "summary": "Improves the PR report deployment workflow so it only publishes the interactive report link when .pr/index.html was actually committed as part of the current PR's changes (via /ship). Previously, a stale report from a prior branch state could trigger a false positive deploy. Now uses git diff between base and head SHAs to verify freshness. When no fresh report is found, posts a helpful warning comment with instructions to run /ship and a note that GitHub Actions must be enabled.",
+  "meta": {
+    "branch": "feature/update-workflow-freshness-check",
+    "target": "master",
+    "generated_at": "2026-03-08T12:00:00Z",
+    "commit_count": 1,
+    "files_changed": 1,
+    "insertions": 32,
+    "deletions": 9
+  },
   "overall_risk": "low",
+  "summary": "Improves the PR report deployment workflow so it only publishes the interactive report link when .pr/index.html was actually committed as part of the current PR's changes (via /ship). Previously, a stale report from a prior branch state could trigger a false positive deploy. Now uses git diff between base and head SHAs to verify freshness. When no fresh report is found, posts a helpful warning comment with instructions to run /ship and a note that GitHub Actions must be enabled.",
   "major_changes": [
     {
       "file": ".github/workflows/pr-report.yml",
-      "description": "Replace file-existence check with git diff freshness check between base and head SHAs. Add second comment path for missing/stale reports with /ship instructions and GitHub Actions enablement warning.",
+      "description": "Replace file-existence check with git diff freshness check; add warning comment path for missing reports",
       "risk": "low",
-      "change_type": "modified",
-      "diff": "fetch-depth: 0 added to checkout; check step now uses git diff --name-only base..head | grep .pr/index.html; output var renamed exists→fresh; new step posts warning comment when fresh=false"
+      "type": "modified",
+      "risk_reason": "",
+      "diff_snippet": "",
+      "components": ["CI/CD"],
+      "lines_added": 32,
+      "lines_removed": 9
     }
   ],
   "minor_changes": [],
   "impacted_components": [
     {
       "name": "CI/CD Workflow",
-      "description": "GitHub Actions deployment pipeline for prism PR reports"
+      "risk": "low",
+      "description": "GitHub Actions deployment pipeline for prism PR reports",
+      "files": [".github/workflows/pr-report.yml"]
     }
   ],
   "test_coverage": {
     "assessment": "untested",
-    "notes": "CI/CD workflow changes are validated when the PR is opened on GitHub — the Actions run will exercise both the fresh=true and fresh=false code paths depending on whether .pr/index.html is in the diff.",
-    "untested_files": []
+    "notes": "CI/CD workflow — validated by the Actions run when this PR opens on GitHub.",
+    "untested_files": [],
+    "test_files_changed": []
   },
   "commits": [
     {
@@ -330,12 +342,7 @@ const DATA = {
       "author": "linus",
       "date": "2026-03-08"
     }
-  ],
-  "stats": {
-    "files_changed": 1,
-    "insertions": 32,
-    "deletions": 9
-  }
+  ]
 };
 
 const h = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
