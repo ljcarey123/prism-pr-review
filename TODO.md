@@ -8,22 +8,21 @@ The install scripts and `.mcp.json` both reference `npx prism-pr-review`, which 
 - [ ] Add a GitHub Actions workflow that auto-publishes on version tags (`v*` push → `npm publish`)
 - [ ] Bump `package.json` version to `0.1.0` on first publish
 
-### Write a public README
-No user-facing documentation exists. Anyone finding the repo has no idea what it does.
-- [ ] One-paragraph pitch + screenshot or GIF of the report UI
-- [ ] Install instructions (run the script → reload Claude Code)
-- [ ] Command reference: `/review-pr`, `/ship`, `/setup-repo`
-- [ ] GitHub Actions setup note (Pages, Actions permissions, Pages bootstrap sequence)
+### Write a public README ✓
+- [x] One-paragraph pitch and how-it-works diagram
+- [x] Install instructions for macOS/Linux and Windows
+- [x] Command reference: `/review-pr`, `/ship`, `/setup-repo`
+- [x] GitHub Actions setup + Pages bootstrap sequence
+- [ ] Add a screenshot or GIF of the report UI
 
 ---
 
 ## Medium priority
 
-### Handle large PRs gracefully
-For PRs with 30+ changed files the AI hits context limits and analysis gets shallow.
-- [ ] Option A: add a `files` filter param to `get_pr_data` so the AI can call it per-file
-- [ ] Option B: cap at N files in the MCP tool and auto-bucket the tail into a "N more files (not shown)" entry in `minor_changes`
-- [ ] Note in `summary` when files were omitted
+### Handle large PRs gracefully ✓
+- [x] Added `files` filter param to `get_pr_data` — AI can call per-file or per-batch
+- [x] Updated `/review-pr` prompt with large-PR workflow (initial call → batch calls)
+- [ ] Note in `summary` when the PR was too large to fully analyse
 
 ### Report versioning
 When `/ship` is re-run on the same branch after review feedback, show what changed since the last report.
