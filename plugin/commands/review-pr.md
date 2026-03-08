@@ -39,6 +39,14 @@ This returns a JSON object with:
 - `diff` — full unified diff
 - `stat` — human-readable stat summary
 
+**Large PRs (30+ files):** The initial call returns the full file list but the diff may be very large. For large PRs, make a second targeted call per file (or per batch of related files) using the `files` parameter to get a focused diff:
+
+```
+get_pr_data({ target_branch: "<target>", files: ["src/auth.ts", "src/auth.test.ts"] })
+```
+
+Use the initial `files[]` list to identify the most significant files, then fetch their diffs in batches of 5–10 for deep analysis. This keeps each call manageable and ensures accurate `diff_snippet` values in the PRAnalysis JSON.
+
 ---
 
 ## Step 3 — Explore the codebase structure
@@ -104,7 +112,7 @@ Working through the git data, produce a structured analysis.
       "diff_snippet": "first ~30 lines of unified diff for this file"
     }
   ],
-  "minor_changes": [ /* same shape, without diff_snippet required */ ],
+  "minor_changes": [ /* same shape as major_changes — include diff_snippet where the diff is available */ ],
   "impacted_components": [
     {
       "name": "Component name",

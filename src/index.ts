@@ -94,7 +94,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       description:
         'Collect all raw git data for the current branch vs a target branch. ' +
         'Returns structured JSON with commits, file changes, diff, and stats. ' +
-        'Always call this first when generating a PR review.',
+        'Always call this first when generating a PR review. ' +
+        'For large PRs (30+ files), call once without `files` to get the full file list, ' +
+        'then call again with a `files` array to get the focused diff for specific files.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -105,6 +107,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           repo_path: {
             type: 'string',
             description: 'Absolute path to the git repo (defaults to cwd)',
+          },
+          files: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional list of file paths to restrict the diff to. Use for large PRs to fetch diffs per file or per batch.',
           },
         },
         required: ['target_branch'],
@@ -144,11 +151,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (name === 'get_pr_data') {
     const target = (args?.target_branch as string) || 'main';
     const cwd = (args?.repo_path as string) || process.cwd();
+    const fileFilter = (args?.files as string[] | undefined) ?? [];
+
+    // Build the path arguments for filtered calls
+    const pathArgs = fileFilter.length > 0
+      ? '-- ' + fileFilter.map(f => `"${f}"`).join(' ')
+      : '-- . ":(exclude)*.lock" ":(exclude)*.sum"';
 
     try {
       const branch = run('git branch --show-current', cwd);
 
-      // Commits: hash|subject|author|ISO-date
+      // Commits: hash|subject|author|ISO-date (not filtered — always show full commit list)
       const logRaw = safeRun(
         `git log "${target}...HEAD" --format="%H|%s|%an|%as" --no-merges`,
         cwd,
@@ -166,9 +179,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         });
 
-      // File status list
+      // File status list (filtered if files param provided)
       const nameStatusRaw = safeRun(
-        `git diff "${target}...HEAD" --name-status`,
+        `git diff "${target}...HEAD" --name-status ${pathArgs}`,
         cwd,
       );
       const files: FileChange[] = nameStatusRaw
@@ -182,12 +195,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         });
 
-      // Stat summary
-      const stat = safeRun(`git diff "${target}...HEAD" --stat`, cwd);
+      // Stat summary (filtered)
+      const stat = safeRun(`git diff "${target}...HEAD" --stat ${pathArgs}`, cwd);
       const { files: filesChanged, insertions, deletions } = parseStatLine(stat);
 
-      // Full diff (capped to avoid giant payloads)
-      const diff = safeRun(`git diff "${target}...HEAD" -- . ":(exclude)*.lock" ":(exclude)*.sum"`, cwd);
+      // Diff (filtered)
+      const diff = safeRun(`git diff "${target}...HEAD" ${pathArgs}`, cwd);
 
       const data: PRRawData = {
         branch,
