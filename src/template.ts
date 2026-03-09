@@ -495,6 +495,7 @@ function changeCard(c, id) {
 function render() {
   const d = DATA;
   d.impacted_components = d.impacted_components || d.components || [];
+  d.commits = d.commits || [];
   const m = d.meta;
   const genDate = new Date(m.generated_at).toLocaleString();
 
