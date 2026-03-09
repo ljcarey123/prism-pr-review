@@ -23,8 +23,6 @@
   "files": [
     "dist/",
     "plugin/",
-    "scripts/install.sh",
-    "scripts/install.ps1",
     "README.md"
   ],
   "keywords": [

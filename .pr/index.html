@@ -225,25 +225,55 @@
     }
 
     /* ── Diff viewer ── */
+    .diff-wrap { margin-top: 10px; }
+    .diff-mode-bar {
+      display: flex;
+      padding: 6px 8px;
+      background: #0a0d10;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+    }
+    .diff-mode-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 2px 10px;
+      cursor: pointer;
+    }
+    .diff-mode-btn:first-child { border-radius: 4px 0 0 4px; }
+    .diff-mode-btn:last-child  { border-radius: 0 4px 4px 0; border-left: none; }
+    .diff-mode-btn.active { background: var(--surface-2); color: var(--text); }
     .diff {
       background: #0a0d10;
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 12px;
+      border-radius: 0 0 6px 6px;
+      overflow-x: auto;
       font-family: 'Courier New', monospace;
       font-size: 12px;
-      overflow-x: auto;
-      white-space: pre;
       line-height: 1.5;
     }
-    .dl { display: block; }
-    .dl.add { color: #3fb950; }
-    .dl.rem { color: #f85149; }
+    .diff-table { width: 100%; border-collapse: collapse; }
+    .diff-table td { padding: 1px 8px; vertical-align: top; white-space: pre; }
+    .ln {
+      width: 42px;
+      color: var(--text-muted);
+      text-align: right;
+      padding-right: 8px;
+      user-select: none;
+      border-right: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .ln-rem { background: rgba(248,81,73,0.06); }
+    .ln-add { background: rgba(63,185,80,0.06); }
+    .dl.add { color: #3fb950; background: rgba(63,185,80,0.1); }
+    .dl.rem { color: #f85149; background: rgba(248,81,73,0.1); }
     .dl.ctx { color: #8b949e; }
     .dl.hdr { color: #79c0ff; }
     .diff-more-btn {
       display: block;
-      margin-top: 8px;
+      margin: 4px 6px;
       background: none;
       border: 1px solid var(--border);
       border-radius: 4px;
@@ -251,7 +281,6 @@
       font-size: 11px;
       padding: 4px 10px;
       cursor: pointer;
-      white-space: normal;
     }
     .diff-more-btn:hover { color: var(--accent); border-color: var(--accent); }
 
@@ -320,7 +349,7 @@
 <body>
 <div id="root"></div>
 <script>
-const DATA = {"meta":{"generated_at":"2026-03-09T17:32:05.466Z","branch":"feature/readme-update","target":"master","tool":"prism","commit_count":2,"files_changed":2,"insertions":67,"deletions":29},"summary":"Rewrites the README with a clear architecture overview explaining how the MCP server, slash commands, and GitHub Actions workflow fit together, and fixes a bug where the report always showed 00:00:00 as the generation time by stamping the real timestamp in the MCP server at write time.","overall_risk":"low","major_changes":[],"minor_changes":[{"file":"README.md","description":"Expanded 'How it works' into three named sections (MCP server, slash commands/hook, GitHub Actions workflow). Added freshness check explanation, updated project structure for refactored src/, and clarified installer steps.","type":"modified","risk":"low","risk_reason":"Documentation only — no functional impact.","components":["Documentation"],"lines_added":62,"lines_removed":26,"diff_snippet":"diff --git a/README.md b/README.md\n+### 1. MCP server (`src/`)\n+A Node.js process exposing two tools:\n+- **`get_pr_data`** — shells out to git to collect the diff, log, and stat summary\n+- **`generate_report`** — injects analysis JSON into the HTML template, writes .pr/index.html\n+\n+### 2. Slash commands + hook (`plugin/`)\n+- **`/review-pr`** — Claude calls get_pr_data, analyses diff, calls generate_report\n+- **`/ship`** — same + commit + push + open GitHub PR\n+- **Pre-PR hook** — fires on gh pr create, prompts to generate report first\n+\n+### 3. GitHub Actions workflow\n+1. Checks whether .pr/index.html was committed in this PR (freshness check)\n+2. If fresh: deploys to Pages, posts PR comment with link\n+3. If stale/missing: posts comment prompting /ship\n+\n+### How the freshness check works\n+The workflow runs git diff between base SHA and head SHA to check whether\n+.pr/index.html was modified in this PR."},{"file":"src/report.ts","description":"generateReport now parses the analysis JSON and overwrites meta.generated_at with new Date().toISOString() before writing the HTML — fixes reports always showing 00:00:00.","type":"modified","risk":"low","risk_reason":"Purely additive fix; doesn't change any other report content.","components":["MCP Server"],"lines_added":5,"lines_removed":3,"diff_snippet":"diff --git a/src/report.ts b/src/report.ts\n-  // Validate JSON before writing\n-  JSON.parse(analysisStr);\n+  // Validate JSON, then stamp the real generation time\n+  const analysis = JSON.parse(analysisStr);\n+  if (analysis.meta) analysis.meta.generated_at = new Date().toISOString();\n+  const stamped = JSON.stringify(analysis);\n \n-  const html = REPORT_TEMPLATE.replace('__PR_DATA__', analysisStr);\n+  const html = REPORT_TEMPLATE.replace('__PR_DATA__', stamped);"}],"impacted_components":[{"name":"Documentation","files":["README.md"],"risk":"low","description":"README now accurately describes all three components and how they interact, including the GitHub Actions freshness check logic."},{"name":"MCP Server","files":["src/report.ts"],"risk":"low","description":"Report generation now stamps the actual wall-clock time instead of trusting the AI-provided timestamp."}],"test_coverage":{"assessment":"none","test_files_changed":[],"untested_files":[],"notes":"Docs change and a one-line timestamp fix — no test coverage needed."},"commits":[{"hash":"38dde3f","message":"fix: stamp actual generation time in report instead of relying on AI-provided value","author":"linus","date":"2026-03-09"},{"hash":"faec767","message":"docs: expand README with architecture overview and GitHub Actions explanation","author":"linus","date":"2026-03-09"}]};
+const DATA = {"meta":{"branch":"feature/npm-install-cmd","target":"master","generated_at":"2026-03-09T22:08:22.718Z","commit_count":4,"files_changed":9,"insertions":300,"deletions":440},"summary":"Replaces the platform-specific bash/PowerShell install scripts with a unified cross-platform `npx prism-pr-review install` command implemented in TypeScript. Also upgrades the MCP server from the deprecated Server/setRequestHandler API to McpServer/registerTool with Zod schemas, and adds a unified/split diff toggle to the report viewer UI.","overall_risk":"low","major_changes":[{"file":"src/index.ts","description":"Refactored from deprecated Server/setRequestHandler API to McpServer/registerTool with Zod input schemas. Added CLI command routing (install/uninstall) before MCP boot.","type":"modified","risk":"low","risk_reason":"Pure API migration — tool behavior is unchanged, only the registration pattern changed to the supported SDK API.","components":["MCP Server","Install CLI"],"lines_added":50,"lines_removed":95,"diff_snippet":"diff --git a/src/index.ts b/src/index.ts\nindex 8c512a1..79816cd 100644\n--- a/src/index.ts\n+++ b/src/index.ts\n@@ -1,10 +1,13 @@\n #!/usr/bin/env node\n-import { Server } from '@modelcontextprotocol/sdk/server/index.js';\n+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';\n import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';\n-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';\n+import { z } from 'zod';\n import { getPrData } from './git.js';\n+import { install, uninstall } from './install.js';\n import { generateReport } from './report.js';\n \n+const cmd = process.argv[2];\n+if (cmd === 'install')   { install();   process.exit(0); }\n+if (cmd === 'uninstall') { uninstall(); process.exit(0); }\n+\n-const server = new Server(\n+const server = new McpServer(\n   { name: 'prism', version: '0.1.0' },\n-  { capabilities: { tools: {} } },\n );\n \n-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...] }));\n-server.setRequestHandler(CallToolRequestSchema, async (request) => { ... });\n+server.registerTool('get_pr_data', { inputSchema: { target_branch: z.string(), ... } }, async ({ target_branch, repo_path, files }) => {\n+  const data = getPrData(target_branch, repo_path ?? process.cwd(), files ?? []);\n+  return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };\n+});\n+server.registerTool('generate_report', { inputSchema: { analysis: z.string(), ... } }, async ({ analysis, output_path, open_browser }) => {\n+  const message = generateReport(analysis, output_path ?? '.pr/index.html', open_browser ?? true);\n+  return { content: [{ type: 'text', text: message }] };\n+});"},{"file":"src/install.ts","description":"New cross-platform install/uninstall module using Node.js fs/os/path APIs. Copies plugin files to ~/.claude/commands/ and ~/.claude/hooks/, and writes the MCP entry to ~/.claude/settings.json.","type":"added","risk":"low","risk_reason":"Straightforward file I/O with no external dependencies; replaces the same logic previously split across two separate shell scripts.","components":["Install CLI"],"lines_added":77,"lines_removed":0,"diff_snippet":"diff --git a/src/install.ts b/src/install.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/install.ts\n@@ -0,0 +1,77 @@\n+import * as fs from 'fs';\n+import * as os from 'os';\n+import * as path from 'path';\n+import { fileURLToPath } from 'url';\n+\n+const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');\n+const CLAUDE_DIR   = path.join(os.homedir(), '.claude');\n+const COMMANDS_DIR = path.join(CLAUDE_DIR, 'commands');\n+const HOOKS_DIR    = path.join(CLAUDE_DIR, 'hooks');\n+const SETTINGS_PATH = path.join(CLAUDE_DIR, 'settings.json');\n+\n+export function install(): void {\n+  fs.mkdirSync(COMMANDS_DIR, { recursive: true });\n+  for (const { src, dest } of COMMANDS) {\n+    fs.copyFileSync(path.join(PACKAGE_ROOT, src), path.join(COMMANDS_DIR, dest));\n+  }\n+  const cfg = readSettings();\n+  cfg.mcpServers = cfg.mcpServers ?? {};\n+  cfg.mcpServers['prism'] = MCP_ENTRY;\n+  writeSettings(cfg);\n+}\n+\n+export function uninstall(): void {\n+  for (const { dest } of COMMANDS) {\n+    const p = path.join(COMMANDS_DIR, dest);\n+    if (fs.existsSync(p)) fs.unlinkSync(p);\n+  }\n+  const cfg = readSettings();\n+  delete cfg.mcpServers?.['prism'];\n+  writeSettings(cfg);\n+}"},{"file":"src/template.ts","description":"Added unified/split diff toggle to the report viewer with table-based line numbers and side-by-side split view. Also added guard for d.commits being undefined.","type":"modified","risk":"low","risk_reason":"Self-contained UI enhancement in the HTML template; no server-side logic or data model changes.","components":["Report Template"],"lines_added":172,"lines_removed":50,"diff_snippet":"diff --git a/src/template.ts b/src/template.ts\n@@ -495,6 +495,7 @@\n function render() {\n   const d = DATA;\n   d.impacted_components = d.impacted_components || d.components || [];\n+  d.commits = d.commits || [];\n   const m = d.meta;\n+  // Added unified/split diff toggle\n+  // New: parseDiffLines, pairRows, renderUnifiedView, renderSplitView, setDiffMode\n+  // Replaces simple <pre>-style diff with table-based renderer with line numbers"}],"minor_changes":[{"file":"README.md","description":"Moved Installation section to top; simplified to single `npx prism-pr-review install` command. Removed old clone+script instructions.","type":"modified","risk":"low","risk_reason":"Documentation only — no functional impact.","components":["Documentation"],"lines_added":34,"lines_removed":53,"diff_snippet":"diff --git a/README.md b/README.md\n+## Installation\n+\n+```bash\n+npx prism-pr-review install\n+```\n+Works on macOS, Linux, and Windows.\n-## Installation\n-### Install (macOS / Linux)\n-```bash\n-git clone ...\n-bash scripts/install.sh\n-```\n-### Install (Windows)\n-```powershell\n-.\\scripts\\install.ps1\n-```"},{"file":"package.json","description":"Removed `scripts/install.sh` and `scripts/install.ps1` from the npm package files array.","type":"modified","risk":"low","risk_reason":"Package config change only.","components":["Package Config"],"lines_added":0,"lines_removed":2,"diff_snippet":"diff --git a/package.json b/package.json\n-    \"scripts/install.sh\",\n-    \"scripts/install.ps1\","},{"file":"package-lock.json","description":"Added engines: { node: '>=18' } to the root package entry.","type":"modified","risk":"low","risk_reason":"Metadata only.","components":["Package Config"],"lines_added":3,"lines_removed":0,"diff_snippet":"diff --git a/package-lock.json b/package-lock.json\n+      \"engines\": {\n+        \"node\": \">=18\"\n+      }"},{"file":"scripts/install.ps1","description":"Deleted the Windows PowerShell installer — replaced by `npx prism-pr-review install`.","type":"deleted","risk":"low","risk_reason":"Functionality replaced by src/install.ts.","components":["Install CLI"],"lines_added":0,"lines_removed":123,"diff_snippet":""},{"file":"scripts/install.sh","description":"Deleted the macOS/Linux bash installer — replaced by `npx prism-pr-review install`.","type":"deleted","risk":"low","risk_reason":"Functionality replaced by src/install.ts.","components":["Install CLI"],"lines_added":0,"lines_removed":135,"diff_snippet":""},{"file":".pr/index.html","description":"Updated embedded DATA object to reflect the latest PR review report.","type":"modified","risk":"low","risk_reason":"Auto-generated report artifact.","components":["Report Template"],"lines_added":1,"lines_removed":1,"diff_snippet":""}],"impacted_components":[{"name":"MCP Server","files":["src/index.ts"],"risk":"low","description":"Core tool registration refactored from legacy Server/setRequestHandler to modern McpServer/registerTool with Zod schemas. Tool behavior unchanged."},{"name":"Install CLI","files":["src/index.ts","src/install.ts","scripts/install.ps1","scripts/install.sh"],"risk":"low","description":"New unified cross-platform install/uninstall via `npx prism-pr-review install`. Replaces separate bash and PowerShell scripts."},{"name":"Report Template","files":["src/template.ts",".pr/index.html"],"risk":"low","description":"Added unified/split diff toggle with table-based line-number rendering and side-by-side split view. Added guard for missing commits field."},{"name":"Documentation","files":["README.md"],"risk":"low","description":"Install-first README with simplified single-command setup."},{"name":"Package Config","files":["package.json","package-lock.json"],"risk":"low","description":"Removed deleted script files from npm published files list; added Node.js >=18 engine requirement."}],"test_coverage":{"assessment":"none","test_files_changed":[],"untested_files":["src/install.ts","src/index.ts"],"notes":"No automated test suite. Install/uninstall logic is file I/O verifiable manually. MCP server refactor is a like-for-like API migration."},"commits":[{"hash":"1b7b3be","message":"feat: add unified/split diff toggle to report viewer","author":"linus","date":"2026-03-09"},{"hash":"82f9833","message":"fix: guard impacted_components in template render","author":"linus","date":"2026-03-09"},{"hash":"9191815","message":"chore: add PR review report","author":"linus","date":"2026-03-09"},{"hash":"29a46b6","message":"feat: add npm package with cross-platform install command","author":"linus","date":"2026-03-09"}]};
 
 const h = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
@@ -334,27 +363,108 @@ function typeBadge(t) {
   return `<span class="type-badge ${t}">${h(t)}</span>`;
 }
 
+var DIFF_SNIPPETS = {};
+
+function parseDiffLines(snippet) {
+  var rows = [], ll = 0, rl = 0;
+  snippet.split('\n').forEach(function(line) {
+    if (!line) return;
+    if (/^(diff |index |--- |\+\+\+ )/.test(line)) { rows.push({t:'hdr', text:line}); return; }
+    if (line.charAt(0) === '@') {
+      var m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (m) { ll = +m[1]; rl = +m[2]; }
+      rows.push({t:'hunk', text:line}); return;
+    }
+    if (line.charAt(0) === '-') { rows.push({t:'rem', ll:ll++, text:line.slice(1)}); return; }
+    if (line.charAt(0) === '+') { rows.push({t:'add', rl:rl++, text:line.slice(1)}); return; }
+    rows.push({t:'ctx', ll:ll++, rl:rl++, text:line.charAt(0)===' '?line.slice(1):line});
+  });
+  return rows;
+}
+
+function pairRows(rows) {
+  var out = [], i = 0;
+  while (i < rows.length) {
+    var r = rows[i];
+    if (r.t !== 'rem' && r.t !== 'add') { out.push(r); i++; continue; }
+    var rems = [], adds = [];
+    while (i < rows.length && (rows[i].t === 'rem' || rows[i].t === 'add')) {
+      if (rows[i].t === 'rem') rems.push(rows[i]); else adds.push(rows[i]);
+      i++;
+    }
+    var n = Math.max(rems.length, adds.length);
+    for (var j = 0; j < n; j++) out.push({t:'change', rem:rems[j]||null, add:adds[j]||null});
+  }
+  return out;
+}
+
+function foldTable(rows, renderRow, cardId, colspan) {
+  var FOLD = 60;
+  var vis = rows.slice(0, FOLD).map(renderRow).join('');
+  var out = '<table class="diff-table">' + vis;
+  if (rows.length > FOLD) {
+    var hid = rows.slice(FOLD).map(renderRow).join('');
+    var more = rows.length - FOLD;
+    out += '<tbody id="' + cardId + '-more" style="display:none">' + hid + '</tbody>';
+    out += '<tr><td colspan="' + colspan + '"><button id="' + cardId + '-btn" class="diff-more-btn" onclick="toggleDiff(\'' + cardId + '\',' + more + ')">&#9660; Show ' + more + ' more rows</button></td></tr>';
+  }
+  return out + '</table>';
+}
+
+function renderUnifiedView(snippet, cardId) {
+  var rows = parseDiffLines(snippet);
+  var renderRow = function(r) {
+    if (r.t === 'hdr' || r.t === 'hunk')
+      return '<tr><td colspan="3" class="dl hdr">' + h(r.text) + '</td></tr>';
+    if (r.t === 'ctx')
+      return '<tr><td class="ln">' + r.ll + '</td><td class="ln">' + r.rl + '</td><td class="dl ctx"> ' + h(r.text) + '</td></tr>';
+    if (r.t === 'rem')
+      return '<tr><td class="ln ln-rem">' + r.ll + '</td><td class="ln"></td><td class="dl rem">-' + h(r.text) + '</td></tr>';
+    return '<tr><td class="ln"></td><td class="ln ln-add">' + r.rl + '</td><td class="dl add">+' + h(r.text) + '</td></tr>';
+  };
+  return foldTable(rows, renderRow, cardId, 3);
+}
+
+function renderSplitView(snippet, cardId) {
+  var rows = pairRows(parseDiffLines(snippet));
+  var renderRow = function(r) {
+    if (r.t === 'hdr' || r.t === 'hunk')
+      return '<tr><td colspan="4" class="dl hdr">' + h(r.text) + '</td></tr>';
+    if (r.t === 'ctx')
+      return '<tr><td class="ln">' + r.ll + '</td><td class="dl ctx">' + h(r.text) + '</td><td class="ln">' + r.rl + '</td><td class="dl ctx">' + h(r.text) + '</td></tr>';
+    var rem = r.rem, add = r.add;
+    return '<tr>' +
+      '<td class="ln ln-rem">' + (rem ? rem.ll : '') + '</td>' +
+      '<td class="dl rem">' + (rem ? h(rem.text) : '') + '</td>' +
+      '<td class="ln ln-add">' + (add ? add.rl : '') + '</td>' +
+      '<td class="dl add">' + (add ? h(add.text) : '') + '</td>' +
+      '</tr>';
+  };
+  return foldTable(rows, renderRow, cardId, 4);
+}
+
 function renderDiff(snippet, cardId) {
   if (!snippet) return '';
-  const FOLD = 40;
-  const all = snippet.split('\n');
-  const renderLine = line => {
-    if (line.startsWith('@@'))  return `<span class="dl hdr">${h(line)}</span>`;
-    if (line.startsWith('+'))   return `<span class="dl add">${h(line)}</span>`;
-    if (line.startsWith('-'))   return `<span class="dl rem">${h(line)}</span>`;
-    return `<span class="dl ctx">${h(line)}</span>`;
-  };
-  const visible = all.slice(0, FOLD).map(renderLine).join('');
-  if (all.length <= FOLD) return `<div class="diff">${visible}</div>`;
-  const hidden  = all.slice(FOLD).map(renderLine).join('');
-  const more    = all.length - FOLD;
-  const moreId  = cardId + '-more';
-  const btnId   = cardId + '-btn';
-  return `<div class="diff">
-    ${visible}
-    <span id="${moreId}" style="display:none">${hidden}</span>
-    <button id="${btnId}" class="diff-more-btn" onclick="toggleDiff('${cardId}',${more})">▼ Show ${more} more lines</button>
-  </div>`;
+  DIFF_SNIPPETS[cardId] = snippet;
+  return '<div class="diff-wrap">' +
+    '<div class="diff-mode-bar">' +
+      '<button class="diff-mode-btn active" onclick="setDiffMode(\'' + cardId + '\',\'unified\',this)">Unified</button>' +
+      '<button class="diff-mode-btn" onclick="setDiffMode(\'' + cardId + '\',\'split\',this)">Split</button>' +
+    '</div>' +
+    '<div id="' + cardId + '-diff" class="diff" data-mode="unified">' +
+      renderUnifiedView(snippet, cardId) +
+    '</div></div>';
+}
+
+function setDiffMode(cardId, mode, btn) {
+  var el = document.getElementById(cardId + '-diff');
+  if (!el || el.dataset.mode === mode) return;
+  el.dataset.mode = mode;
+  var snippet = DIFF_SNIPPETS[cardId] || '';
+  el.innerHTML = mode === 'split' ? renderSplitView(snippet, cardId) : renderUnifiedView(snippet, cardId);
+  var bar = btn.closest('.diff-mode-bar');
+  bar.querySelectorAll('.diff-mode-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
 }
 
 function changeCard(c, id) {
@@ -380,6 +490,7 @@ function changeCard(c, id) {
 
 function render() {
   const d = DATA;
+  d.impacted_components = d.impacted_components || d.components || [];
   const m = d.meta;
   const genDate = new Date(m.generated_at).toLocaleString();
 
@@ -523,8 +634,8 @@ function toggleDiff(cardId, total) {
   const btn  = document.getElementById(cardId + '-btn');
   if (!more || !btn) return;
   const expanded = more.style.display !== 'none';
-  more.style.display = expanded ? 'none' : 'inline';
-  btn.textContent   = expanded ? `▼ Show ${total} more lines` : '▲ Show less';
+  more.style.display = expanded ? 'none' : '';
+  btn.textContent = expanded ? '▼ Show ' + total + ' more rows' : '▲ Show less';
 }
 
 render();

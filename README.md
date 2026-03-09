@@ -6,6 +6,34 @@ Prism refracts your git diff into a clear, structured HTML report — classifyin
 
 ---
 
+## Installation
+
+### Prerequisites
+- [Node.js](https://nodejs.org) 18+
+- [Claude Code](https://claude.ai/code)
+- [GitHub CLI](https://cli.github.com) (`gh`) — required for `/ship`
+
+### Install
+
+```bash
+npx prism-pr-review install
+```
+
+Works on macOS, Linux, and Windows. This single command:
+1. Copies slash commands to `~/.claude/commands/`
+2. Copies the pre-PR hook to `~/.claude/hooks/`
+3. Adds the prism MCP server entry to `~/.claude/settings.json`
+
+**Restart Claude Code after installing.**
+
+### Uninstall
+
+```bash
+npx prism-pr-review uninstall
+```
+
+---
+
 ## How it works
 
 Prism has three parts that work together:
@@ -59,53 +87,6 @@ The report itself includes:
 - **Impacted components** — maps files to logical areas of the codebase
 - **Test coverage assessment** — flags untested critical paths
 - **Commit list** — full commit history for the branch
-
----
-
-## Installation
-
-### Prerequisites
-- [Node.js](https://nodejs.org) 18+
-- [Claude Code](https://claude.ai/code)
-- [GitHub CLI](https://cli.github.com) (`gh`) — required for `/ship`
-
-### Install (macOS / Linux)
-
-```bash
-git clone https://github.com/ljcarey123/prism-pr-review
-cd prism-pr-review
-bash scripts/install.sh
-```
-
-### Install (Windows)
-
-```powershell
-git clone https://github.com/ljcarey123/prism-pr-review
-cd prism-pr-review
-.\scripts\install.ps1
-```
-
-The installer:
-1. Copies slash commands to `~/.claude/commands/`
-2. Copies the pre-PR hook to `~/.claude/hooks/`
-3. Registers the prism MCP server in `~/.claude/settings.json` using `npx -y prism-pr-review`
-
-**Restart Claude Code after installing.**
-
-### Manual MCP setup
-
-Add to `~/.claude/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "prism": {
-      "command": "npx",
-      "args": ["-y", "prism-pr-review"]
-    }
-  }
-}
-```
 
 ---
 
@@ -165,7 +146,8 @@ The workflow runs `git diff` between the base branch SHA and the PR head SHA to 
 ```
 prism-pr-review/
 ├── src/
-│   ├── index.ts          # MCP server entry — registers tools, routes requests
+│   ├── index.ts          # Entry point — CLI (install/uninstall) + MCP server
+│   ├── install.ts        # install / uninstall logic (cross-platform)
 │   ├── git.ts            # get_pr_data implementation (git shell calls)
 │   ├── report.ts         # generate_report implementation (write HTML, open browser)
 │   ├── template.ts       # Self-contained HTML report template (~600 lines)
@@ -181,10 +163,7 @@ prism-pr-review/
 │   └── workflows/
 │       ├── pr-report.yml # Deploy report to Pages + post PR comment
 │       └── publish.yml   # Auto-publish to npm on version tag push
-├── scripts/
-│   ├── install.sh        # macOS/Linux installer
-│   └── install.ps1       # Windows installer
-├── package.json
+├── package.json          # `npx prism-pr-review install` entry point
 └── tsconfig.json
 ```
 
