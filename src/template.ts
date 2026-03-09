@@ -63,17 +63,23 @@ export const REPORT_TEMPLATE = `<!DOCTYPE html>
     }
     .stats-bar {
       display: flex;
-      gap: 28px;
+      flex-wrap: wrap;
+      gap: 18px 28px;
       margin-top: 18px;
       padding-top: 18px;
       border-top: 1px solid var(--border);
       align-items: center;
     }
     .stat { display: flex; flex-direction: column; }
+    .stat-risk { margin-left: auto; }
     .stat-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
     .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
     .added { color: #3fb950; }
     .removed { color: #f85149; }
+    @media (max-width: 600px) {
+      .header { padding: 16px; }
+      .stat-risk { margin-left: 0; }
+    }
 
     /* ── Risk badges ── */
     .risk {
@@ -407,7 +413,7 @@ function render() {
           <span class="stat-value removed">-\${m.deletions}</span>
           <span class="stat-label">Deletions</span>
         </div>
-        <div class="stat" style="margin-left:auto">
+        <div class="stat stat-risk">
           <span class="stat-value">\${riskBadge(d.overall_risk)}</span>
           <span class="stat-label">Overall risk</span>
         </div>
