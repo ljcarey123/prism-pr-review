@@ -59,17 +59,23 @@
     }
     .stats-bar {
       display: flex;
-      gap: 28px;
+      flex-wrap: wrap;
+      gap: 18px 28px;
       margin-top: 18px;
       padding-top: 18px;
       border-top: 1px solid var(--border);
       align-items: center;
     }
     .stat { display: flex; flex-direction: column; }
+    .stat-risk { margin-left: auto; }
     .stat-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
     .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
     .added { color: #3fb950; }
     .removed { color: #f85149; }
+    @media (max-width: 600px) {
+      .header { padding: 16px; }
+      .stat-risk { margin-left: 0; }
+    }
 
     /* ── Risk badges ── */
     .risk {
@@ -317,39 +323,65 @@
 const DATA = {
   "meta": {
     "generated_at": "2026-03-09T00:00:00Z",
-    "branch": "feature/mobile-nav-fix",
+    "branch": "feature/npm-publish",
     "target": "master",
-    "tool": "prism"
+    "tool": "prism",
+    "commit_count": 2,
+    "files_changed": 3,
+    "insertions": 88,
+    "deletions": 19
   },
-  "summary": "Single-file CSS fix to the report nav bar. Adds overflow-x: auto and supporting properties so the navigation scrolls horizontally on small/mobile screens instead of overflowing the viewport width. No logic changes.",
+  "summary": "Prepares prism for public npm release. Adds missing package.json metadata (author, repository, homepage, engines) and a prepublishOnly build step, plus a GitHub Actions workflow that automatically publishes to npm when a version tag is pushed. Risk is low — CI config and metadata only, no logic changes.",
   "overall_risk": "low",
-  "major_changes": [],
+  "major_changes": [
+    {
+      "file": ".github/workflows/publish.yml",
+      "description": "New CI workflow: triggers on v* tag pushes, installs deps, builds, then publishes to npm using an NPM_TOKEN secret.",
+      "type": "added",
+      "risk": "low",
+      "risk_reason": "Requires NPM_TOKEN secret to be configured before it can publish — no accidental publish risk, and only repo admins can push tags.",
+      "components": ["CI / CD"],
+      "lines_added": 23,
+      "lines_removed": 0,
+      "diff_snippet": "diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml\nnew file mode 100644\n--- /dev/null\n+++ b/.github/workflows/publish.yml\n@@ -0,0 +1,23 @@\n+name: Publish to npm\n+\n+on:\n+  push:\n+    tags:\n+      - 'v*'\n+\n+jobs:\n+  publish:\n+    runs-on: ubuntu-latest\n+    steps:\n+      - uses: actions/checkout@v4\n+      - uses: actions/setup-node@v4\n+        with:\n+          node-version: '20'\n+          registry-url: 'https://registry.npmjs.org'\n+      - run: npm ci\n+      - run: npm run build\n+      - run: npm publish\n+        env:\n+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}"
+    }
+  ],
   "minor_changes": [
     {
-      "file": "src/template.ts",
-      "description": "Nav bar made horizontally scrollable: removed fixed padding, added overflow-x:auto, -webkit-overflow-scrolling:touch, scrollbar-width:none, flex-shrink:0 on links, and moved horizontal padding to first/last-child pseudo-selectors.",
-      "diff_snippet": "diff --git a/src/template.ts b/src/template.ts\n--- a/src/template.ts\n+++ b/src/template.ts\n@@ -110 @@\n-      padding: 0 28px;\n+      overflow-x: auto;\n+      -webkit-overflow-scrolling: touch;\n+      scrollbar-width: none;\n+    }\n+    .nav::-webkit-scrollbar { display: none; }\n+      flex-shrink: 0;\n+    .nav a:first-child { padding-left: 28px; }\n+    .nav a:last-child  { padding-right: 28px; }"
+      "file": "package.json",
+      "description": "Added author, repository, homepage, engines (node>=18), and prepublishOnly script — all required fields for a clean npm publish.",
+      "type": "modified",
+      "risk": "low",
+      "risk_reason": "Metadata only; prepublishOnly just runs the existing build step before publish.",
+      "components": ["Package Config"],
+      "lines_added": 12,
+      "lines_removed": 2,
+      "diff_snippet": "diff --git a/package.json b/package.json\n--- a/package.json\n+++ b/package.json\n@@ -9,7 +9,8 @@\n-    \"dev\": \"tsc --watch\"\n+    \"dev\": \"tsc --watch\",\n+    \"prepublishOnly\": \"npm run build\"\n@@ -33,5 +34,14 @@\n-  \"license\": \"MIT\"\n+  \"author\": \"Linus Carey\",\n+  \"license\": \"MIT\",\n+  \"repository\": { \"type\": \"git\", \"url\": \"https://github.com/ljcarey123/prism-pr-review.git\" },\n+  \"homepage\": \"https://github.com/ljcarey123/prism-pr-review#readme\",\n+  \"engines\": { \"node\": \">=18\" }"
     }
   ],
   "impacted_components": [
     {
-      "name": "Report UI / Nav bar",
-      "description": "The sticky navigation bar in all generated HTML reports will now scroll horizontally on narrow viewports.",
-      "files": ["src/template.ts"]
+      "name": "CI / CD",
+      "files": [".github/workflows/publish.yml"],
+      "risk": "low",
+      "description": "Auto-publishes to npm on version tag push. Requires NPM_TOKEN secret in GitHub repo settings before it does anything."
+    },
+    {
+      "name": "Package Config",
+      "files": ["package.json"],
+      "risk": "low",
+      "description": "Package is now correctly described for the npm registry — author, repo link, homepage, and Node engine constraint."
     }
   ],
   "test_coverage": {
     "assessment": "none",
-    "notes": "CSS-only change in a self-contained HTML template; no automated tests exist for the report UI.",
-    "untested_files": []
+    "test_files_changed": [],
+    "untested_files": [],
+    "notes": "Config and CI changes only — no testable logic added."
   },
   "commits": [
-    {
-      "hash": "f8b79ef",
-      "message": "fix: make nav bar horizontally scrollable on small screens",
-      "author": "linus",
-      "date": "2026-03-09"
-    }
+    { "hash": "0f5905d", "message": "chore: add PR review report", "author": "linus", "date": "2026-03-09" },
+    { "hash": "5c9e34d", "message": "chore: add npm publish metadata and auto-publish workflow", "author": "linus", "date": "2026-03-09" }
   ]
 };
 
@@ -440,7 +472,7 @@ function render() {
           <span class="stat-value removed">-${m.deletions}</span>
           <span class="stat-label">Deletions</span>
         </div>
-        <div class="stat" style="margin-left:auto">
+        <div class="stat stat-risk">
           <span class="stat-value">${riskBadge(d.overall_risk)}</span>
           <span class="stat-label">Overall risk</span>
         </div>
@@ -488,7 +520,7 @@ function render() {
             <div>
               <p class="comp-desc">${h(comp.description)}</p>
               <div class="comp-files">
-                ${comp.files.map(f => `<span class="comp-file">${h(f)}</span>`).join('')}
+                ${(comp.files || []).map(f => `<span class="comp-file">${h(f)}</span>`).join('')}
               </div>
             </div>
           </div>
