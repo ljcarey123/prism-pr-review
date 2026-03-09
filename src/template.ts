@@ -229,25 +229,55 @@ export const REPORT_TEMPLATE = `<!DOCTYPE html>
     }
 
     /* ── Diff viewer ── */
+    .diff-wrap { margin-top: 10px; }
+    .diff-mode-bar {
+      display: flex;
+      padding: 6px 8px;
+      background: #0a0d10;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+    }
+    .diff-mode-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 2px 10px;
+      cursor: pointer;
+    }
+    .diff-mode-btn:first-child { border-radius: 4px 0 0 4px; }
+    .diff-mode-btn:last-child  { border-radius: 0 4px 4px 0; border-left: none; }
+    .diff-mode-btn.active { background: var(--surface-2); color: var(--text); }
     .diff {
       background: #0a0d10;
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 12px;
+      border-radius: 0 0 6px 6px;
+      overflow-x: auto;
       font-family: 'Courier New', monospace;
       font-size: 12px;
-      overflow-x: auto;
-      white-space: pre;
       line-height: 1.5;
     }
-    .dl { display: block; }
-    .dl.add { color: #3fb950; }
-    .dl.rem { color: #f85149; }
+    .diff-table { width: 100%; border-collapse: collapse; }
+    .diff-table td { padding: 1px 8px; vertical-align: top; white-space: pre; }
+    .ln {
+      width: 42px;
+      color: var(--text-muted);
+      text-align: right;
+      padding-right: 8px;
+      user-select: none;
+      border-right: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .ln-rem { background: rgba(248,81,73,0.06); }
+    .ln-add { background: rgba(63,185,80,0.06); }
+    .dl.add { color: #3fb950; background: rgba(63,185,80,0.1); }
+    .dl.rem { color: #f85149; background: rgba(248,81,73,0.1); }
     .dl.ctx { color: #8b949e; }
     .dl.hdr { color: #79c0ff; }
     .diff-more-btn {
       display: block;
-      margin-top: 8px;
+      margin: 4px 6px;
       background: none;
       border: 1px solid var(--border);
       border-radius: 4px;
@@ -255,7 +285,6 @@ export const REPORT_TEMPLATE = `<!DOCTYPE html>
       font-size: 11px;
       padding: 4px 10px;
       cursor: pointer;
-      white-space: normal;
     }
     .diff-more-btn:hover { color: var(--accent); border-color: var(--accent); }
 
@@ -338,27 +367,108 @@ function typeBadge(t) {
   return \`<span class="type-badge \${t}">\${h(t)}</span>\`;
 }
 
+var DIFF_SNIPPETS = {};
+
+function parseDiffLines(snippet) {
+  var rows = [], ll = 0, rl = 0;
+  snippet.split('\\n').forEach(function(line) {
+    if (!line) return;
+    if (/^(diff |index |--- |\\+\\+\\+ )/.test(line)) { rows.push({t:'hdr', text:line}); return; }
+    if (line.charAt(0) === '@') {
+      var m = line.match(/@@ -(\\d+)(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@/);
+      if (m) { ll = +m[1]; rl = +m[2]; }
+      rows.push({t:'hunk', text:line}); return;
+    }
+    if (line.charAt(0) === '-') { rows.push({t:'rem', ll:ll++, text:line.slice(1)}); return; }
+    if (line.charAt(0) === '+') { rows.push({t:'add', rl:rl++, text:line.slice(1)}); return; }
+    rows.push({t:'ctx', ll:ll++, rl:rl++, text:line.charAt(0)===' '?line.slice(1):line});
+  });
+  return rows;
+}
+
+function pairRows(rows) {
+  var out = [], i = 0;
+  while (i < rows.length) {
+    var r = rows[i];
+    if (r.t !== 'rem' && r.t !== 'add') { out.push(r); i++; continue; }
+    var rems = [], adds = [];
+    while (i < rows.length && (rows[i].t === 'rem' || rows[i].t === 'add')) {
+      if (rows[i].t === 'rem') rems.push(rows[i]); else adds.push(rows[i]);
+      i++;
+    }
+    var n = Math.max(rems.length, adds.length);
+    for (var j = 0; j < n; j++) out.push({t:'change', rem:rems[j]||null, add:adds[j]||null});
+  }
+  return out;
+}
+
+function foldTable(rows, renderRow, cardId, colspan) {
+  var FOLD = 60;
+  var vis = rows.slice(0, FOLD).map(renderRow).join('');
+  var out = '<table class="diff-table">' + vis;
+  if (rows.length > FOLD) {
+    var hid = rows.slice(FOLD).map(renderRow).join('');
+    var more = rows.length - FOLD;
+    out += '<tbody id="' + cardId + '-more" style="display:none">' + hid + '</tbody>';
+    out += '<tr><td colspan="' + colspan + '"><button id="' + cardId + '-btn" class="diff-more-btn" onclick="toggleDiff(\'' + cardId + '\',' + more + ')">&#9660; Show ' + more + ' more rows</button></td></tr>';
+  }
+  return out + '</table>';
+}
+
+function renderUnifiedView(snippet, cardId) {
+  var rows = parseDiffLines(snippet);
+  var renderRow = function(r) {
+    if (r.t === 'hdr' || r.t === 'hunk')
+      return '<tr><td colspan="3" class="dl hdr">' + h(r.text) + '</td></tr>';
+    if (r.t === 'ctx')
+      return '<tr><td class="ln">' + r.ll + '</td><td class="ln">' + r.rl + '</td><td class="dl ctx"> ' + h(r.text) + '</td></tr>';
+    if (r.t === 'rem')
+      return '<tr><td class="ln ln-rem">' + r.ll + '</td><td class="ln"></td><td class="dl rem">-' + h(r.text) + '</td></tr>';
+    return '<tr><td class="ln"></td><td class="ln ln-add">' + r.rl + '</td><td class="dl add">+' + h(r.text) + '</td></tr>';
+  };
+  return foldTable(rows, renderRow, cardId, 3);
+}
+
+function renderSplitView(snippet, cardId) {
+  var rows = pairRows(parseDiffLines(snippet));
+  var renderRow = function(r) {
+    if (r.t === 'hdr' || r.t === 'hunk')
+      return '<tr><td colspan="4" class="dl hdr">' + h(r.text) + '</td></tr>';
+    if (r.t === 'ctx')
+      return '<tr><td class="ln">' + r.ll + '</td><td class="dl ctx">' + h(r.text) + '</td><td class="ln">' + r.rl + '</td><td class="dl ctx">' + h(r.text) + '</td></tr>';
+    var rem = r.rem, add = r.add;
+    return '<tr>' +
+      '<td class="ln ln-rem">' + (rem ? rem.ll : '') + '</td>' +
+      '<td class="dl rem">' + (rem ? h(rem.text) : '') + '</td>' +
+      '<td class="ln ln-add">' + (add ? add.rl : '') + '</td>' +
+      '<td class="dl add">' + (add ? h(add.text) : '') + '</td>' +
+      '</tr>';
+  };
+  return foldTable(rows, renderRow, cardId, 4);
+}
+
 function renderDiff(snippet, cardId) {
   if (!snippet) return '';
-  const FOLD = 40;
-  const all = snippet.split('\\n');
-  const renderLine = line => {
-    if (line.startsWith('@@'))  return \`<span class="dl hdr">\${h(line)}</span>\`;
-    if (line.startsWith('+'))   return \`<span class="dl add">\${h(line)}</span>\`;
-    if (line.startsWith('-'))   return \`<span class="dl rem">\${h(line)}</span>\`;
-    return \`<span class="dl ctx">\${h(line)}</span>\`;
-  };
-  const visible = all.slice(0, FOLD).map(renderLine).join('');
-  if (all.length <= FOLD) return \`<div class="diff">\${visible}</div>\`;
-  const hidden  = all.slice(FOLD).map(renderLine).join('');
-  const more    = all.length - FOLD;
-  const moreId  = cardId + '-more';
-  const btnId   = cardId + '-btn';
-  return \`<div class="diff">
-    \${visible}
-    <span id="\${moreId}" style="display:none">\${hidden}</span>
-    <button id="\${btnId}" class="diff-more-btn" onclick="toggleDiff('\${cardId}',\${more})">▼ Show \${more} more lines</button>
-  </div>\`;
+  DIFF_SNIPPETS[cardId] = snippet;
+  return '<div class="diff-wrap">' +
+    '<div class="diff-mode-bar">' +
+      '<button class="diff-mode-btn active" onclick="setDiffMode(\'' + cardId + '\',\'unified\',this)">Unified</button>' +
+      '<button class="diff-mode-btn" onclick="setDiffMode(\'' + cardId + '\',\'split\',this)">Split</button>' +
+    '</div>' +
+    '<div id="' + cardId + '-diff" class="diff" data-mode="unified">' +
+      renderUnifiedView(snippet, cardId) +
+    '</div></div>';
+}
+
+function setDiffMode(cardId, mode, btn) {
+  var el = document.getElementById(cardId + '-diff');
+  if (!el || el.dataset.mode === mode) return;
+  el.dataset.mode = mode;
+  var snippet = DIFF_SNIPPETS[cardId] || '';
+  el.innerHTML = mode === 'split' ? renderSplitView(snippet, cardId) : renderUnifiedView(snippet, cardId);
+  var bar = btn.closest('.diff-mode-bar');
+  bar.querySelectorAll('.diff-mode-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
 }
 
 function changeCard(c, id) {
@@ -528,8 +638,8 @@ function toggleDiff(cardId, total) {
   const btn  = document.getElementById(cardId + '-btn');
   if (!more || !btn) return;
   const expanded = more.style.display !== 'none';
-  more.style.display = expanded ? 'none' : 'inline';
-  btn.textContent   = expanded ? \`▼ Show \${total} more lines\` : '▲ Show less';
+  more.style.display = expanded ? 'none' : '';
+  btn.textContent = expanded ? '▼ Show ' + total + ' more rows' : '▲ Show less';
 }
 
 render();
