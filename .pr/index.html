@@ -310,93 +310,82 @@
 <script>
 const DATA = {
   "meta": {
-    "branch": "feature/readme-and-large-pr-support",
+    "branch": "feature/src-refactor",
     "target": "master",
-    "generated_at": "2026-03-08T15:00:00Z",
+    "generated_at": "2026-03-09T09:00:00Z",
     "commit_count": 1,
     "files_changed": 4,
-    "insertions": 122,
-    "deletions": 66
+    "insertions": 173,
+    "deletions": 164
   },
-  "summary": "Rewrites the public README with accurate documentation covering all three slash commands, correct settings.json paths, and a full GitHub Actions/Pages setup guide. Adds a `files` filter parameter to the `get_pr_data` MCP tool so the AI can make targeted per-file or per-batch diff calls on large PRs (30+ files), preventing context overload. Minor change cards in the report now include diff snippets on par with major changes.",
+  "summary": "Pure refactor of src/ with no behaviour changes. Splits the original monolithic index.ts (270 lines) into four focused modules: types.ts for interfaces, git.ts for shell helpers and the getPrData implementation, report.ts for browser opening and report generation, and a slimmed-down index.ts that only handles MCP server setup, tool schemas, request routing, and boot.",
   "overall_risk": "low",
   "major_changes": [
     {
       "file": "src/index.ts",
-      "description": "Add optional `files` param to get_pr_data; filters diff, stat, and name-status to specified paths only — enables per-file/batch calls for large PRs",
+      "description": "Stripped down to MCP server setup, tool schemas, request routing, and boot — all implementation logic moved to dedicated modules",
       "type": "modified",
       "risk": "low",
-      "risk_reason": "Additive change — when `files` is omitted the tool behaves identically to before. No security or data risk.",
+      "risk_reason": "Pure structural refactor; tool names, parameters, and return values are unchanged.",
       "components": ["MCP Server"],
-      "lines_added": 29,
-      "lines_removed": 9,
-      "diff_snippet": "diff --git a/src/index.ts b/src/index.ts\n@@ -151,11 +151,17 @@\n   if (name === 'get_pr_data') {\n     const target = (args?.target_branch as string) || 'main';\n     const cwd = (args?.repo_path as string) || process.cwd();\n+    const fileFilter = (args?.files as string[] | undefined) ?? [];\n+\n+    const pathArgs = fileFilter.length > 0\n+      ? '-- ' + fileFilter.map(f => `\"${f}\"`).join(' ')\n+      : '-- . \":(exclude)*.lock\" \":(exclude)*.sum\"';\n \n-      const nameStatusRaw = safeRun(\n-        `git diff \"${target}...HEAD\" --name-status`,\n+      const nameStatusRaw = safeRun(\n+        `git diff \"${target}...HEAD\" --name-status ${pathArgs}`,\n         cwd,\n       );\n-      const stat = safeRun(`git diff \"${target}...HEAD\" --stat`, cwd);\n+      const stat = safeRun(`git diff \"${target}...HEAD\" --stat ${pathArgs}`, cwd);\n-      const diff = safeRun(`git diff \"${target}...HEAD\" -- . \":(exclude)*.lock\" \":(exclude)*.sum\"`, cwd);\n+      const diff = safeRun(`git diff \"${target}...HEAD\" ${pathArgs}`, cwd);"
+      "lines_added": 18,
+      "lines_removed": 164,
+      "diff_snippet": "diff --git a/src/index.ts b/src/index.ts\n@@ -5,88 +5,18 @@\n-import { execSync, spawnSync } from 'child_process';\n-import * as fs from 'fs';\n-import * as path from 'path';\n-import { REPORT_TEMPLATE } from './template.js';\n+import { getPrData } from './git.js';\n+import { generateReport } from './report.js';\n \n-interface CommitInfo { ... }\n-interface FileChange { ... }\n-interface PRRawData { ... }\n-function run(...) { ... }\n-function safeRun(...) { ... }\n-function parseStatLine(...) { ... }\n-function openFile(...) { ... }\n \n+// ── Tool definitions ──────────────────────────────────────────────────────────\n \n   if (name === 'get_pr_data') {\n     try {\n-      const branch = run(...);\n-      const logRaw = safeRun(...);\n-      ...\n+      const data = getPrData(\n+        (args?.target_branch as string) || 'main',\n+        (args?.repo_path as string) || process.cwd(),\n+        (args?.files as string[] | undefined) ?? [],\n+      );\n       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };\n \n   if (name === 'generate_report') {\n     try {\n-      JSON.parse(analysisStr);\n-      const html = REPORT_TEMPLATE.replace(...);\n-      fs.writeFileSync(...);\n-      if (openBrowser) openFile(outputPath);\n+      const message = generateReport(\n+        args?.analysis as string,\n+        (args?.output_path as string) || '.pr/index.html',\n+        (args?.open_browser as boolean) ?? true,\n+      );\n       return { content: [{ type: 'text', text: message }] };"
     },
     {
-      "file": "README.md",
-      "description": "Full rewrite: correct settings.json paths (was mcp.json), add /ship and /setup-repo docs, GitHub integration section, Pages bootstrap guide, updated project structure",
-      "type": "modified",
+      "file": "src/git.ts",
+      "description": "New module: run/safeRun shell helpers, parseStatLine, and getPrData() extracted from index.ts",
+      "type": "added",
       "risk": "low",
-      "risk_reason": "Documentation only — no functional impact.",
-      "components": ["Documentation"],
-      "lines_added": 93,
-      "lines_removed": 57,
-      "diff_snippet": "diff --git a/README.md b/README.md\n@@ -4,7 +4,9 @@\n Prism refracts your git diff into a clear, structured HTML report...\n+When you run `/ship`, the report is committed to `.pr/index.html`, pushed,\n+and a GitHub PR is opened with an AI-generated summary. A GitHub Actions\n+workflow then deploys it to GitHub Pages and posts the link as a PR comment.\n \n-Add to ~/.claude/mcp.json:\n+Add to `~/.claude/settings.json`:\n \n+### `/setup-repo`\n+One-time setup for a repo. Copies the GitHub Actions workflow, verifies\n+Actions permissions, and guides through enabling GitHub Pages."
+      "risk_reason": "Code moved verbatim from index.ts — no logic changes.",
+      "components": ["MCP Server"],
+      "lines_added": 88,
+      "lines_removed": 0,
+      "diff_snippet": "diff --git a/src/git.ts b/src/git.ts\nnew file mode 100644\n@@ -0,0 +1,88 @@\n+import { execSync } from 'child_process';\n+import type { CommitInfo, FileChange, PRRawData } from './types.js';\n+\n+export function run(cmd: string, cwd?: string): string {\n+  return execSync(cmd, { encoding: 'utf8', cwd, maxBuffer: 20 * 1024 * 1024 }).trim();\n+}\n+\n+export function safeRun(cmd: string, cwd?: string): string {\n+  try { return run(cmd, cwd); } catch { return ''; }\n+}\n+\n+export function getPrData(target: string, cwd: string, fileFilter: string[]): PRRawData {\n+  const pathArgs = fileFilter.length > 0\n+    ? '-- ' + fileFilter.map(f => `\"${f}\"`).join(' ')\n+    : '-- . \":(exclude)*.lock\" \":(exclude)*.sum\"';\n+  const branch = run('git branch --show-current', cwd);\n+  // ... commits, files, stat, diff collection\n+  return { branch, target, commits, files, insertions, deletions, files_changed, diff, stat };\n+}"
     }
   ],
   "minor_changes": [
     {
-      "file": "plugin/commands/review-pr.md",
-      "description": "Document large-PR batching workflow; update minor_changes schema comment to include diff_snippet",
-      "type": "modified",
+      "file": "src/report.ts",
+      "description": "New module: openFile() browser helper and generateReport() extracted from index.ts",
+      "type": "added",
       "risk": "low",
-      "risk_reason": "Prompt improvements only — better guidance for the AI, no functional change.",
-      "components": ["Plugin Commands"],
-      "lines_added": 9,
-      "lines_removed": 1,
-      "diff_snippet": "diff --git a/plugin/commands/review-pr.md b/plugin/commands/review-pr.md\n@@ -39,6 +39,14 @@\n+**Large PRs (30+ files):** The initial call returns the full file list but\n+the diff may be very large. For large PRs, make a second targeted call per\n+file (or per batch of related files) using the `files` parameter:\n+\n+```\n+get_pr_data({ target_branch: \"<target>\", files: [\"src/auth.ts\", \"src/auth.test.ts\"] })\n+```\n+\n-  \"minor_changes\": [ /* same shape, without diff_snippet required */ ],\n+  \"minor_changes\": [ /* same shape as major_changes — include diff_snippet where the diff is available */ ],"
+      "risk_reason": "Code moved verbatim from index.ts — no logic changes.",
+      "components": ["MCP Server"],
+      "lines_added": 42,
+      "lines_removed": 0,
+      "diff_snippet": "diff --git a/src/report.ts b/src/report.ts\nnew file mode 100644\n@@ -0,0 +1,42 @@\n+export function generateReport(analysisStr: string, outputPath: string, openBrowser: boolean): string {\n+  JSON.parse(analysisStr);\n+  const html = REPORT_TEMPLATE.replace('__PR_DATA__', analysisStr);\n+  const dir = path.dirname(outputPath);\n+  if (dir && dir !== '.') fs.mkdirSync(dir, { recursive: true });\n+  fs.writeFileSync(outputPath, html, 'utf8');\n+  if (openBrowser) openFile(outputPath);\n+  return `Report written to ${path.resolve(outputPath)}...`;\n+}"
     },
     {
-      "file": "TODO.md",
-      "description": "Mark README and large-PR handling tasks complete; add screenshot/GIF as remaining README item",
-      "type": "modified",
+      "file": "src/types.ts",
+      "description": "New module: CommitInfo, FileChange, PRRawData interfaces extracted from index.ts",
+      "type": "added",
       "risk": "low",
-      "risk_reason": "Documentation only.",
-      "components": ["Documentation"],
-      "lines_added": 8,
-      "lines_removed": 11
+      "risk_reason": "Interfaces moved verbatim — no type changes.",
+      "components": ["MCP Server"],
+      "lines_added": 25,
+      "lines_removed": 0,
+      "diff_snippet": "diff --git a/src/types.ts b/src/types.ts\nnew file mode 100644\n@@ -0,0 +1,25 @@\n+export interface CommitInfo { hash: string; message: string; author: string; date: string; }\n+export interface FileChange { status: string; file: string; }\n+export interface PRRawData { branch: string; target: string; commits: CommitInfo[]; files: FileChange[]; insertions: number; deletions: number; files_changed: number; diff: string; stat: string; }"
     }
   ],
   "impacted_components": [
     {
       "name": "MCP Server",
-      "files": ["src/index.ts"],
+      "files": ["src/index.ts", "src/git.ts", "src/report.ts", "src/types.ts"],
       "risk": "low",
-      "description": "get_pr_data tool gains a files filter param, enabling targeted diff fetching for large PRs without breaking existing callers."
-    },
-    {
-      "name": "Documentation",
-      "files": ["README.md", "TODO.md"],
-      "risk": "low",
-      "description": "README corrected and expanded — removes stale mcp.json references, documents all commands and GitHub integration."
-    },
-    {
-      "name": "Plugin Commands",
-      "files": ["plugin/commands/review-pr.md"],
-      "risk": "low",
-      "description": "Prompt updated for better large-PR handling and minor change diffs."
+      "description": "Internal restructuring only. Public tool interface (names, schemas, return shapes) is unchanged."
     }
   ],
   "test_coverage": {
     "assessment": "none",
-    "notes": "No automated test suite. The files-filter change is exercised by calling get_pr_data with the files param; the README and prompt changes are verified by reading them.",
+    "notes": "No automated tests. Refactor verified by clean tsc build with no errors.",
     "untested_files": [],
     "test_files_changed": []
   },
   "commits": [
     {
-      "hash": "e8a8c1f",
-      "message": "feat: public README, large PR support, minor change diffs",
+      "hash": "53d9409",
+      "message": "refactor: split src/ into types, git, report, and index modules",
       "author": "linus",
       "date": "2026-03-08"
     }

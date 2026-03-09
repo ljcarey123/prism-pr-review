@@ -5,87 +5,17 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { execSync, spawnSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import { REPORT_TEMPLATE } from './template.js';
+import { getPrData } from './git.js';
+import { generateReport } from './report.js';
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-interface CommitInfo {
-  hash: string;
-  message: string;
-  author: string;
-  date: string;
-}
-
-interface FileChange {
-  status: string;  // A=Added, M=Modified, D=Deleted, R=Renamed
-  file: string;
-}
-
-interface PRRawData {
-  branch: string;
-  target: string;
-  commits: CommitInfo[];
-  files: FileChange[];
-  insertions: number;
-  deletions: number;
-  files_changed: number;
-  diff: string;
-  stat: string;
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function run(cmd: string, cwd?: string): string {
-  return execSync(cmd, {
-    encoding: 'utf8',
-    cwd,
-    maxBuffer: 20 * 1024 * 1024,
-  }).trim();
-}
-
-function safeRun(cmd: string, cwd?: string): string {
-  try {
-    return run(cmd, cwd);
-  } catch {
-    return '';
-  }
-}
-
-function parseStatLine(stat: string): { files: number; insertions: number; deletions: number } {
-  const filesMatch = stat.match(/(\d+) files? changed/);
-  const insMatch = stat.match(/(\d+) insertion/);
-  const delMatch = stat.match(/(\d+) deletion/);
-  return {
-    files: filesMatch ? parseInt(filesMatch[1]) : 0,
-    insertions: insMatch ? parseInt(insMatch[1]) : 0,
-    deletions: delMatch ? parseInt(delMatch[1]) : 0,
-  };
-}
-
-function openFile(filePath: string): void {
-  const abs = path.resolve(filePath);
-  try {
-    if (process.platform === 'win32') {
-      spawnSync('cmd.exe', ['/c', 'start', '', abs], { stdio: 'ignore' });
-    } else if (process.platform === 'darwin') {
-      spawnSync('open', [abs], { stdio: 'ignore' });
-    } else {
-      spawnSync('xdg-open', [abs], { stdio: 'ignore' });
-    }
-  } catch {
-    // Best-effort; not critical
-  }
-}
-
-// ── MCP Server ───────────────────────────────────────────────────────────────
+// ── MCP Server ────────────────────────────────────────────────────────────────
 
 const server = new Server(
   { name: 'prism', version: '0.1.0' },
   { capabilities: { tools: {} } },
 );
+
+// ── Tool definitions ──────────────────────────────────────────────────────────
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
@@ -144,76 +74,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   ],
 }));
 
+// ── Request routing ───────────────────────────────────────────────────────────
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  // ── Tool: get_pr_data ──────────────────────────────────────────────────────
   if (name === 'get_pr_data') {
-    const target = (args?.target_branch as string) || 'main';
-    const cwd = (args?.repo_path as string) || process.cwd();
-    const fileFilter = (args?.files as string[] | undefined) ?? [];
-
-    // Build the path arguments for filtered calls
-    const pathArgs = fileFilter.length > 0
-      ? '-- ' + fileFilter.map(f => `"${f}"`).join(' ')
-      : '-- . ":(exclude)*.lock" ":(exclude)*.sum"';
-
     try {
-      const branch = run('git branch --show-current', cwd);
-
-      // Commits: hash|subject|author|ISO-date (not filtered — always show full commit list)
-      const logRaw = safeRun(
-        `git log "${target}...HEAD" --format="%H|%s|%an|%as" --no-merges`,
-        cwd,
+      const data = getPrData(
+        (args?.target_branch as string) || 'main',
+        (args?.repo_path as string) || process.cwd(),
+        (args?.files as string[] | undefined) ?? [],
       );
-      const commits: CommitInfo[] = logRaw
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => {
-          const [hash, message, author, date] = line.split('|');
-          return {
-            hash: hash?.trim() ?? '',
-            message: message?.trim() ?? '',
-            author: author?.trim() ?? '',
-            date: date?.trim() ?? '',
-          };
-        });
-
-      // File status list (filtered if files param provided)
-      const nameStatusRaw = safeRun(
-        `git diff "${target}...HEAD" --name-status ${pathArgs}`,
-        cwd,
-      );
-      const files: FileChange[] = nameStatusRaw
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => {
-          const parts = line.split('\t');
-          return {
-            status: parts[0]?.charAt(0) ?? 'M',
-            file: parts.slice(1).join('\t').trim(),
-          };
-        });
-
-      // Stat summary (filtered)
-      const stat = safeRun(`git diff "${target}...HEAD" --stat ${pathArgs}`, cwd);
-      const { files: filesChanged, insertions, deletions } = parseStatLine(stat);
-
-      // Diff (filtered)
-      const diff = safeRun(`git diff "${target}...HEAD" ${pathArgs}`, cwd);
-
-      const data: PRRawData = {
-        branch,
-        target,
-        commits,
-        files,
-        insertions,
-        deletions,
-        files_changed: filesChanged,
-        diff,
-        stat,
-      };
-
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
     } catch (err) {
       return {
@@ -223,32 +95,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   }
 
-  // ── Tool: generate_report ──────────────────────────────────────────────────
   if (name === 'generate_report') {
-    const analysisStr = args?.analysis as string;
-    const outputPath = (args?.output_path as string) || '.pr/index.html';
-    const openBrowser = (args?.open_browser as boolean) ?? true;
-
     try {
-      // Validate JSON
-      JSON.parse(analysisStr);
-
-      const html = REPORT_TEMPLATE.replace('__PR_DATA__', analysisStr);
-
-      const dir = path.dirname(outputPath);
-      if (dir && dir !== '.') fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(outputPath, html, 'utf8');
-
-      if (openBrowser) openFile(outputPath);
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Report written to ${path.resolve(outputPath)}${openBrowser ? ' and opened in browser.' : '.'}`,
-          },
-        ],
-      };
+      const message = generateReport(
+        args?.analysis as string,
+        (args?.output_path as string) || '.pr/index.html',
+        (args?.open_browser as boolean) ?? true,
+      );
+      return { content: [{ type: 'text', text: message }] };
     } catch (err) {
       return {
         content: [{ type: 'text', text: `Error generating report: ${err}` }],
@@ -263,7 +117,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   };
 });
 
-// ── Boot ─────────────────────────────────────────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────────────────────────
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
