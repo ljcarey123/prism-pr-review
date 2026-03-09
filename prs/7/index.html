@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PR Review</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #21262d;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --high: #f85149;
+      --high-bg: rgba(248,81,73,0.12);
+      --medium: #d29922;
+      --medium-bg: rgba(210,153,34,0.12);
+      --low: #3fb950;
+      --low-bg: rgba(63,185,80,0.12);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 24px 32px;
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .branch-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .branch-pill {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-family: 'Courier New', monospace;
+      color: var(--accent);
+      font-size: 12px;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 28px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      align-items: center;
+    }
+    .stat { display: flex; flex-direction: column; }
+    .stat-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+    .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 2px; }
+    .added { color: #3fb950; }
+    .removed { color: #f85149; }
+
+    /* ── Risk badges ── */
+    .risk {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .risk.high   { color: var(--high);   background: var(--high-bg);   border: 1px solid rgba(248,81,73,0.35); }
+    .risk.medium { color: var(--medium); background: var(--medium-bg); border: 1px solid rgba(210,153,34,0.35); }
+    .risk.low    { color: var(--low);    background: var(--low-bg);    border: 1px solid rgba(63,185,80,0.35); }
+
+    /* ── Type badges ── */
+    .type-badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .type-badge.added    { color: #3fb950; background: rgba(63,185,80,0.15); }
+    .type-badge.modified { color: #79c0ff; background: rgba(121,192,255,0.15); }
+    .type-badge.deleted  { color: #f85149; background: rgba(248,81,73,0.15); }
+    .type-badge.renamed  { color: #d29922; background: rgba(210,153,34,0.15); }
+
+    /* ── Nav ── */
+    .nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 2px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav a {
+      padding: 11px 14px;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .nav a:first-child { padding-left: 28px; }
+    .nav a:last-child  { padding-right: 28px; }
+    .nav a:hover { color: var(--text); }
+    .nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    /* ── Main ── */
+    .main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px;
+    }
+    .section { margin-bottom: 44px; }
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .count { background: var(--surface-2); border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--text-muted); }
+    .empty { color: var(--text-muted); font-size: 13px; font-style: italic; }
+
+    /* ── Summary card ── */
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    /* ── Change cards ── */
+    .change-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .change-card:hover { border-color: #484f58; }
+    .change-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .change-file {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .change-desc {
+      color: var(--text-muted);
+      font-size: 13px;
+      flex: 2;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .line-stats { font-size: 12px; font-family: monospace; white-space: nowrap; }
+    .chevron { color: var(--text-muted); font-size: 10px; transition: transform 0.15s; flex-shrink: 0; }
+    .change-card.open .chevron { transform: rotate(90deg); }
+    .change-body {
+      border-top: 1px solid var(--border);
+      padding: 16px;
+      display: none;
+    }
+    .change-card.open .change-body { display: block; }
+    .risk-reason { color: var(--text-muted); font-size: 13px; margin-bottom: 10px; }
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .tag {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ── Diff viewer ── */
+    .diff {
+      background: #0a0d10;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+    .dl { display: block; }
+    .dl.add { color: #3fb950; }
+    .dl.rem { color: #f85149; }
+    .dl.ctx { color: #8b949e; }
+    .dl.hdr { color: #79c0ff; }
+    .diff-more-btn {
+      display: block;
+      margin-top: 8px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: normal;
+    }
+    .diff-more-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Components ── */
+    .comp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 6px;
+      display: grid;
+      grid-template-columns: 180px 1fr auto;
+      gap: 16px;
+      align-items: start;
+    }
+    .comp-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .comp-desc { color: var(--text-muted); font-size: 13px; margin-bottom: 8px; }
+    .comp-files { font-family: monospace; font-size: 12px; color: var(--text-muted); }
+    .comp-file { display: block; padding: 1px 0; }
+
+    /* ── Test coverage ── */
+    .coverage-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .coverage-score {
+      font-size: 28px;
+      font-weight: 700;
+      text-transform: capitalize;
+      margin-bottom: 8px;
+    }
+    .coverage-score.high   { color: var(--low); }
+    .coverage-score.medium { color: var(--medium); }
+    .coverage-score.low    { color: var(--high); }
+    .coverage-score.none   { color: var(--high); }
+    .file-list { margin-top: 14px; }
+    .file-list-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+    .cov-file { font-family: monospace; font-size: 12px; display: block; padding: 2px 0; }
+    .cov-file.fail { color: #f85149; }
+    .cov-file.pass { color: #3fb950; }
+
+    /* ── Commits ── */
+    .commit-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 4px;
+    }
+    .commit-hash { font-family: monospace; font-size: 12px; color: var(--accent); width: 56px; flex-shrink: 0; }
+    .commit-msg  { flex: 1; font-size: 13px; }
+    .commit-meta { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const DATA = {
+  "meta": {
+    "generated_at": "2026-03-09T00:00:00Z",
+    "branch": "feature/mobile-nav-fix",
+    "target": "master",
+    "tool": "prism"
+  },
+  "summary": "Single-file CSS fix to the report nav bar. Adds `overflow-x: auto` and supporting properties so the navigation scrolls horizontally on small/mobile screens instead of overflowing the viewport width. No logic changes.",
+  "overall_risk": "low",
+  "major_changes": [],
+  "minor_changes": [
+    {
+      "file": "src/template.ts",
+      "description": "Nav bar made horizontally scrollable: removed fixed padding, added overflow-x:auto, -webkit-overflow-scrolling:touch, scrollbar-width:none, flex-shrink:0 on links, and moved horizontal padding to first/last-child pseudo-selectors.",
+      "diff_snippet": "diff --git a/src/template.ts b/src/template.ts\n--- a/src/template.ts\n+++ b/src/template.ts\n@@ -110 @@\n-      padding: 0 28px;\n+      overflow-x: auto;\n+      -webkit-overflow-scrolling: touch;\n+      scrollbar-width: none;\n+    }\n+    .nav::-webkit-scrollbar { display: none; }\n+      flex-shrink: 0;\n+    .nav a:first-child { padding-left: 28px; }\n+    .nav a:last-child  { padding-right: 28px; }"
+    }
+  ],
+  "impacted_components": [
+    {
+      "name": "Report UI / Nav bar",
+      "description": "The sticky navigation bar in all generated HTML reports will now scroll horizontally on narrow viewports."
+    }
+  ],
+  "test_coverage": {
+    "assessment": "none",
+    "notes": "CSS-only change in a self-contained HTML template; no automated tests exist for the report UI.",
+    "untested_files": []
+  },
+  "commits": [
+    {
+      "hash": "f8b79ef",
+      "message": "fix: make nav bar horizontally scrollable on small screens",
+      "author": "linus",
+      "date": "2026-03-09"
+    }
+  ]
+};
+
+const h = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function riskBadge(r) {
+  const icons = { high: '⚠', medium: '~', low: '✓' };
+  const labels = { high: 'HIGH', medium: 'MED', low: 'LOW' };
+  return `<span class="risk ${r}">${icons[r] || ''} ${labels[r] || r}</span>`;
+}
+
+function typeBadge(t) {
+  return `<span class="type-badge ${t}">${h(t)}</span>`;
+}
+
+function renderDiff(snippet, cardId) {
+  if (!snippet) return '';
+  const FOLD = 40;
+  const all = snippet.split('\n');
+  const renderLine = line => {
+    if (line.startsWith('@@'))  return `<span class="dl hdr">${h(line)}</span>`;
+    if (line.startsWith('+'))   return `<span class="dl add">${h(line)}</span>`;
+    if (line.startsWith('-'))   return `<span class="dl rem">${h(line)}</span>`;
+    return `<span class="dl ctx">${h(line)}</span>`;
+  };
+  const visible = all.slice(0, FOLD).map(renderLine).join('');
+  if (all.length <= FOLD) return `<div class="diff">${visible}</div>`;
+  const hidden  = all.slice(FOLD).map(renderLine).join('');
+  const more    = all.length - FOLD;
+  const moreId  = cardId + '-more';
+  const btnId   = cardId + '-btn';
+  return `<div class="diff">
+    ${visible}
+    <span id="${moreId}" style="display:none">${hidden}</span>
+    <button id="${btnId}" class="diff-more-btn" onclick="toggleDiff('${cardId}',${more})">▼ Show ${more} more lines</button>
+  </div>`;
+}
+
+function changeCard(c, id) {
+  const diff = c.diff_snippet ? renderDiff(c.diff_snippet, id) : '';
+  const components = (c.components || []).map(t => `<span class="tag">${h(t)}</span>`).join('');
+  return `
+    <div class="change-card" id="cc-${id}">
+      <div class="change-header" onclick="toggle('cc-${id}')">
+        <span class="chevron">▶</span>
+        ${typeBadge(c.type)}
+        <span class="change-file" title="${h(c.file)}">${h(c.file)}</span>
+        <span class="change-desc" title="${h(c.description)}">${h(c.description)}</span>
+        <span class="line-stats"><span class="added">+${c.lines_added || 0}</span> <span class="removed">-${c.lines_removed || 0}</span></span>
+        ${riskBadge(c.risk)}
+      </div>
+      <div class="change-body">
+        ${c.risk_reason ? `<p class="risk-reason">⚠ ${h(c.risk_reason)}</p>` : ''}
+        ${components ? `<div class="tags">${components}</div>` : ''}
+        ${diff}
+      </div>
+    </div>`;
+}
+
+function render() {
+  const d = DATA;
+  const m = d.meta;
+  const genDate = new Date(m.generated_at).toLocaleString();
+
+  document.getElementById('root').innerHTML = `
+    <div class="header">
+      <h1>PR Review: ${h(m.branch)}</h1>
+      <div class="branch-row">
+        <span class="branch-pill">${h(m.branch)}</span>
+        <span>→</span>
+        <span class="branch-pill">${h(m.target)}</span>
+        <span style="margin-left:8px">Generated ${genDate}</span>
+      </div>
+      <div class="stats-bar">
+        <div class="stat">
+          <span class="stat-value">${m.commit_count}</span>
+          <span class="stat-label">Commits</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">${m.files_changed}</span>
+          <span class="stat-label">Files changed</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value added">+${m.insertions}</span>
+          <span class="stat-label">Insertions</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value removed">-${m.deletions}</span>
+          <span class="stat-label">Deletions</span>
+        </div>
+        <div class="stat" style="margin-left:auto">
+          <span class="stat-value">${riskBadge(d.overall_risk)}</span>
+          <span class="stat-label">Overall risk</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="#summary">Summary</a>
+      <a href="#major">Major (${d.major_changes.length})</a>
+      <a href="#minor">Minor (${d.minor_changes.length})</a>
+      <a href="#components">Components (${d.impacted_components.length})</a>
+      <a href="#coverage">Test coverage</a>
+      <a href="#commits">Commits (${d.commits.length})</a>
+    </nav>
+
+    <div class="main">
+
+      <section class="section" id="summary">
+        <h2 class="section-title">Executive Summary</h2>
+        <div class="summary-card">${h(d.summary)}</div>
+      </section>
+
+      <section class="section" id="major">
+        <h2 class="section-title">Major Changes <span class="count">${d.major_changes.length}</span></h2>
+        ${d.major_changes.length
+          ? d.major_changes.map((c, i) => changeCard(c, 'maj' + i)).join('')
+          : '<p class="empty">No major changes detected.</p>'}
+      </section>
+
+      <section class="section" id="minor">
+        <h2 class="section-title">Minor Changes <span class="count">${d.minor_changes.length}</span></h2>
+        ${d.minor_changes.length
+          ? d.minor_changes.map((c, i) => changeCard(c, 'min' + i)).join('')
+          : '<p class="empty">No minor changes detected.</p>'}
+      </section>
+
+      <section class="section" id="components">
+        <h2 class="section-title">Impacted Components <span class="count">${d.impacted_components.length}</span></h2>
+        ${d.impacted_components.map(comp => `
+          <div class="comp-card">
+            <div>
+              <div class="comp-name">${h(comp.name)}</div>
+              ${riskBadge(comp.risk)}
+            </div>
+            <div>
+              <p class="comp-desc">${h(comp.description)}</p>
+              <div class="comp-files">
+                ${comp.files.map(f => `<span class="comp-file">${h(f)}</span>`).join('')}
+              </div>
+            </div>
+          </div>
+        `).join('') || '<p class="empty">No components identified.</p>'}
+      </section>
+
+      <section class="section" id="coverage">
+        <h2 class="section-title">Test Coverage</h2>
+        <div class="coverage-card">
+          <div class="coverage-score ${d.test_coverage.assessment}">${d.test_coverage.assessment} coverage</div>
+          <p style="color:var(--text-muted);font-size:13px">${h(d.test_coverage.notes)}</p>
+          ${d.test_coverage.untested_files?.length ? `
+            <div class="file-list">
+              <div class="file-list-label">Missing test coverage</div>
+              ${d.test_coverage.untested_files.map(f => `<span class="cov-file fail">✗ ${h(f)}</span>`).join('')}
+            </div>` : ''}
+          ${d.test_coverage.test_files_changed?.length ? `
+            <div class="file-list" style="margin-top:12px">
+              <div class="file-list-label">Test files modified</div>
+              ${d.test_coverage.test_files_changed.map(f => `<span class="cov-file pass">✓ ${h(f)}</span>`).join('')}
+            </div>` : ''}
+        </div>
+      </section>
+
+      <section class="section" id="commits">
+        <h2 class="section-title">Commits <span class="count">${d.commits.length}</span></h2>
+        ${d.commits.map(c => `
+          <div class="commit-item">
+            <span class="commit-hash">${h(String(c.hash).substring(0, 7))}</span>
+            <span class="commit-msg">${h(c.message)}</span>
+            <span class="commit-meta">${h(c.author)} · ${h(c.date)}</span>
+          </div>
+        `).join('')}
+      </section>
+
+    </div>
+  `;
+
+  // Highlight active nav link on scroll
+  const sections = ['summary','major','minor','components','coverage','commits'];
+  const navLinks = document.querySelectorAll('.nav a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const link = document.querySelector(`.nav a[href="#${e.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+}
+
+function toggle(id) {
+  document.getElementById(id)?.classList.toggle('open');
+}
+
+function toggleDiff(cardId, total) {
+  const more = document.getElementById(cardId + '-more');
+  const btn  = document.getElementById(cardId + '-btn');
+  if (!more || !btn) return;
+  const expanded = more.style.display !== 'none';
+  more.style.display = expanded ? 'none' : 'inline';
+  btn.textContent   = expanded ? `▼ Show ${total} more lines` : '▲ Show less';
+}
+
+render();
+</script>
+</body>
+</html>
