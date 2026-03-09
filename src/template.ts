@@ -110,13 +110,16 @@ export const REPORT_TEMPLATE = `<!DOCTYPE html>
     .nav {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 0 28px;
       display: flex;
       gap: 2px;
       position: sticky;
       top: 0;
       z-index: 200;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
     }
+    .nav::-webkit-scrollbar { display: none; }
     .nav a {
       padding: 11px 14px;
       color: var(--text-muted);
@@ -125,7 +128,10 @@ export const REPORT_TEMPLATE = `<!DOCTYPE html>
       border-bottom: 2px solid transparent;
       transition: color 0.15s, border-color 0.15s;
       white-space: nowrap;
+      flex-shrink: 0;
     }
+    .nav a:first-child { padding-left: 28px; }
+    .nav a:last-child  { padding-right: 28px; }
     .nav a:hover { color: var(--text); }
     .nav a.active { color: var(--text); border-bottom-color: var(--accent); }
 
