@@ -410,7 +410,7 @@ function foldTable(rows, renderRow, cardId, colspan) {
     var hid = rows.slice(FOLD).map(renderRow).join('');
     var more = rows.length - FOLD;
     out += '<tbody id="' + cardId + '-more" style="display:none">' + hid + '</tbody>';
-    out += '<tr><td colspan="' + colspan + '"><button id="' + cardId + '-btn" class="diff-more-btn" onclick="toggleDiff(\'' + cardId + '\',' + more + ')">&#9660; Show ' + more + ' more rows</button></td></tr>';
+    out += '<tr><td colspan="' + colspan + '"><button id="' + cardId + '-btn" class="diff-more-btn" onclick="toggleDiff(\\'' + cardId + '\\',' + more + ')">&#9660; Show ' + more + ' more rows</button></td></tr>';
   }
   return out + '</table>';
 }
@@ -452,8 +452,8 @@ function renderDiff(snippet, cardId) {
   DIFF_SNIPPETS[cardId] = snippet;
   return '<div class="diff-wrap">' +
     '<div class="diff-mode-bar">' +
-      '<button class="diff-mode-btn active" onclick="setDiffMode(\'' + cardId + '\',\'unified\',this)">Unified</button>' +
-      '<button class="diff-mode-btn" onclick="setDiffMode(\'' + cardId + '\',\'split\',this)">Split</button>' +
+      '<button class="diff-mode-btn active" onclick="setDiffMode(\\'' + cardId + '\\',\\'unified\\',this)">Unified</button>' +
+      '<button class="diff-mode-btn" onclick="setDiffMode(\\'' + cardId + '\\',\\'split\\',this)">Split</button>' +
     '</div>' +
     '<div id="' + cardId + '-diff" class="diff" data-mode="unified">' +
       renderUnifiedView(snippet, cardId) +
