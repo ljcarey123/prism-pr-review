@@ -321,7 +321,7 @@ const DATA = {
     "target": "master",
     "tool": "prism"
   },
-  "summary": "Single-file CSS fix to the report nav bar. Adds `overflow-x: auto` and supporting properties so the navigation scrolls horizontally on small/mobile screens instead of overflowing the viewport width. No logic changes.",
+  "summary": "Single-file CSS fix to the report nav bar. Adds overflow-x: auto and supporting properties so the navigation scrolls horizontally on small/mobile screens instead of overflowing the viewport width. No logic changes.",
   "overall_risk": "low",
   "major_changes": [],
   "minor_changes": [
@@ -334,7 +334,8 @@ const DATA = {
   "impacted_components": [
     {
       "name": "Report UI / Nav bar",
-      "description": "The sticky navigation bar in all generated HTML reports will now scroll horizontally on narrow viewports."
+      "description": "The sticky navigation bar in all generated HTML reports will now scroll horizontally on narrow viewports.",
+      "files": ["src/template.ts"]
     }
   ],
   "test_coverage": {
