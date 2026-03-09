@@ -326,20 +326,20 @@ const DATA = {
     "branch": "feature/npm-publish",
     "target": "master",
     "tool": "prism",
-    "commit_count": 1,
-    "files_changed": 2,
-    "insertions": 35,
-    "deletions": 2
+    "commit_count": 2,
+    "files_changed": 3,
+    "insertions": 88,
+    "deletions": 19
   },
-  "summary": "Prepares prism for public npm release. Adds missing package.json metadata (author, repository, homepage, engines) and a prepublishOnly build step, plus a GitHub Actions workflow that automatically publishes to npm when a version tag is pushed.",
+  "summary": "Prepares prism for public npm release. Adds missing package.json metadata (author, repository, homepage, engines) and a prepublishOnly build step, plus a GitHub Actions workflow that automatically publishes to npm when a version tag is pushed. Risk is low — CI config and metadata only, no logic changes.",
   "overall_risk": "low",
   "major_changes": [
     {
       "file": ".github/workflows/publish.yml",
-      "description": "New workflow: triggers on v* tags, runs npm ci + build + publish using an NPM_TOKEN secret stored in GitHub.",
+      "description": "New CI workflow: triggers on v* tag pushes, installs deps, builds, then publishes to npm using an NPM_TOKEN secret.",
       "type": "added",
       "risk": "low",
-      "risk_reason": "CI-only change; requires NPM_TOKEN secret to be configured before it can publish — no accidental publish risk.",
+      "risk_reason": "Requires NPM_TOKEN secret to be configured before it can publish — no accidental publish risk, and only repo admins can push tags.",
       "components": ["CI / CD"],
       "lines_added": 23,
       "lines_removed": 0,
@@ -349,14 +349,14 @@ const DATA = {
   "minor_changes": [
     {
       "file": "package.json",
-      "description": "Added author, repository, homepage, engines (node>=18), and prepublishOnly script. All required fields for a clean npm publish.",
+      "description": "Added author, repository, homepage, engines (node>=18), and prepublishOnly script — all required fields for a clean npm publish.",
       "type": "modified",
       "risk": "low",
-      "risk_reason": "Metadata only; prepublishOnly just runs the existing build step.",
+      "risk_reason": "Metadata only; prepublishOnly just runs the existing build step before publish.",
       "components": ["Package Config"],
       "lines_added": 12,
       "lines_removed": 2,
-      "diff_snippet": "diff --git a/package.json b/package.json\n--- a/package.json\n+++ b/package.json\n@@ -9 @@\n+    \"prepublishOnly\": \"npm run build\"\n@@ -33 @@\n+  \"author\": \"Linus Carey\",\n+  \"repository\": { \"type\": \"git\", \"url\": \"https://github.com/ljcarey123/prism-pr-review.git\" },\n+  \"homepage\": \"https://github.com/ljcarey123/prism-pr-review#readme\",\n+  \"engines\": { \"node\": \">=18\" }"
+      "diff_snippet": "diff --git a/package.json b/package.json\n--- a/package.json\n+++ b/package.json\n@@ -9,7 +9,8 @@\n-    \"dev\": \"tsc --watch\"\n+    \"dev\": \"tsc --watch\",\n+    \"prepublishOnly\": \"npm run build\"\n@@ -33,5 +34,14 @@\n-  \"license\": \"MIT\"\n+  \"author\": \"Linus Carey\",\n+  \"license\": \"MIT\",\n+  \"repository\": { \"type\": \"git\", \"url\": \"https://github.com/ljcarey123/prism-pr-review.git\" },\n+  \"homepage\": \"https://github.com/ljcarey123/prism-pr-review#readme\",\n+  \"engines\": { \"node\": \">=18\" }"
     }
   ],
   "impacted_components": [
@@ -364,7 +364,7 @@ const DATA = {
       "name": "CI / CD",
       "files": [".github/workflows/publish.yml"],
       "risk": "low",
-      "description": "Auto-publishes to npm on version tag push. Requires NPM_TOKEN secret in GitHub repo settings."
+      "description": "Auto-publishes to npm on version tag push. Requires NPM_TOKEN secret in GitHub repo settings before it does anything."
     },
     {
       "name": "Package Config",
@@ -380,12 +380,8 @@ const DATA = {
     "notes": "Config and CI changes only — no testable logic added."
   },
   "commits": [
-    {
-      "hash": "5c9e34d",
-      "message": "chore: add npm publish metadata and auto-publish workflow",
-      "author": "linus",
-      "date": "2026-03-09"
-    }
+    { "hash": "0f5905d", "message": "chore: add PR review report", "author": "linus", "date": "2026-03-09" },
+    { "hash": "5c9e34d", "message": "chore: add npm publish metadata and auto-publish workflow", "author": "linus", "date": "2026-03-09" }
   ]
 };
 
