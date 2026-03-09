@@ -455,7 +455,7 @@ function render() {
             <div>
               <p class="comp-desc">\${h(comp.description)}</p>
               <div class="comp-files">
-                \${comp.files.map(f => \`<span class="comp-file">\${h(f)}</span>\`).join('')}
+                \${(comp.files || []).map(f => \`<span class="comp-file">\${h(f)}</span>\`).join('')}
               </div>
             </div>
           </div>
