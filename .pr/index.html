@@ -106,13 +106,16 @@
     .nav {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 0 28px;
       display: flex;
       gap: 2px;
       position: sticky;
       top: 0;
       z-index: 200;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
     }
+    .nav::-webkit-scrollbar { display: none; }
     .nav a {
       padding: 11px 14px;
       color: var(--text-muted);
@@ -121,7 +124,10 @@
       border-bottom: 2px solid transparent;
       transition: color 0.15s, border-color 0.15s;
       white-space: nowrap;
+      flex-shrink: 0;
     }
+    .nav a:first-child { padding-left: 28px; }
+    .nav a:last-child  { padding-right: 28px; }
     .nav a:hover { color: var(--text); }
     .nav a.active { color: var(--text); border-bottom-color: var(--accent); }
 
@@ -310,84 +316,39 @@
 <script>
 const DATA = {
   "meta": {
-    "branch": "feature/src-refactor",
+    "generated_at": "2026-03-09T00:00:00Z",
+    "branch": "feature/mobile-nav-fix",
     "target": "master",
-    "generated_at": "2026-03-09T09:00:00Z",
-    "commit_count": 1,
-    "files_changed": 4,
-    "insertions": 173,
-    "deletions": 164
+    "tool": "prism"
   },
-  "summary": "Pure refactor of src/ with no behaviour changes. Splits the original monolithic index.ts (270 lines) into four focused modules: types.ts for interfaces, git.ts for shell helpers and the getPrData implementation, report.ts for browser opening and report generation, and a slimmed-down index.ts that only handles MCP server setup, tool schemas, request routing, and boot.",
+  "summary": "Single-file CSS fix to the report nav bar. Adds overflow-x: auto and supporting properties so the navigation scrolls horizontally on small/mobile screens instead of overflowing the viewport width. No logic changes.",
   "overall_risk": "low",
-  "major_changes": [
-    {
-      "file": "src/index.ts",
-      "description": "Stripped down to MCP server setup, tool schemas, request routing, and boot — all implementation logic moved to dedicated modules",
-      "type": "modified",
-      "risk": "low",
-      "risk_reason": "Pure structural refactor; tool names, parameters, and return values are unchanged.",
-      "components": ["MCP Server"],
-      "lines_added": 18,
-      "lines_removed": 164,
-      "diff_snippet": "diff --git a/src/index.ts b/src/index.ts\n@@ -5,88 +5,18 @@\n-import { execSync, spawnSync } from 'child_process';\n-import * as fs from 'fs';\n-import * as path from 'path';\n-import { REPORT_TEMPLATE } from './template.js';\n+import { getPrData } from './git.js';\n+import { generateReport } from './report.js';\n \n-interface CommitInfo { ... }\n-interface FileChange { ... }\n-interface PRRawData { ... }\n-function run(...) { ... }\n-function safeRun(...) { ... }\n-function parseStatLine(...) { ... }\n-function openFile(...) { ... }\n \n+// ── Tool definitions ──────────────────────────────────────────────────────────\n \n   if (name === 'get_pr_data') {\n     try {\n-      const branch = run(...);\n-      const logRaw = safeRun(...);\n-      ...\n+      const data = getPrData(\n+        (args?.target_branch as string) || 'main',\n+        (args?.repo_path as string) || process.cwd(),\n+        (args?.files as string[] | undefined) ?? [],\n+      );\n       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };\n \n   if (name === 'generate_report') {\n     try {\n-      JSON.parse(analysisStr);\n-      const html = REPORT_TEMPLATE.replace(...);\n-      fs.writeFileSync(...);\n-      if (openBrowser) openFile(outputPath);\n+      const message = generateReport(\n+        args?.analysis as string,\n+        (args?.output_path as string) || '.pr/index.html',\n+        (args?.open_browser as boolean) ?? true,\n+      );\n       return { content: [{ type: 'text', text: message }] };"
-    },
-    {
-      "file": "src/git.ts",
-      "description": "New module: run/safeRun shell helpers, parseStatLine, and getPrData() extracted from index.ts",
-      "type": "added",
-      "risk": "low",
-      "risk_reason": "Code moved verbatim from index.ts — no logic changes.",
-      "components": ["MCP Server"],
-      "lines_added": 88,
-      "lines_removed": 0,
-      "diff_snippet": "diff --git a/src/git.ts b/src/git.ts\nnew file mode 100644\n@@ -0,0 +1,88 @@\n+import { execSync } from 'child_process';\n+import type { CommitInfo, FileChange, PRRawData } from './types.js';\n+\n+export function run(cmd: string, cwd?: string): string {\n+  return execSync(cmd, { encoding: 'utf8', cwd, maxBuffer: 20 * 1024 * 1024 }).trim();\n+}\n+\n+export function safeRun(cmd: string, cwd?: string): string {\n+  try { return run(cmd, cwd); } catch { return ''; }\n+}\n+\n+export function getPrData(target: string, cwd: string, fileFilter: string[]): PRRawData {\n+  const pathArgs = fileFilter.length > 0\n+    ? '-- ' + fileFilter.map(f => `\"${f}\"`).join(' ')\n+    : '-- . \":(exclude)*.lock\" \":(exclude)*.sum\"';\n+  const branch = run('git branch --show-current', cwd);\n+  // ... commits, files, stat, diff collection\n+  return { branch, target, commits, files, insertions, deletions, files_changed, diff, stat };\n+}"
-    }
-  ],
+  "major_changes": [],
   "minor_changes": [
     {
-      "file": "src/report.ts",
-      "description": "New module: openFile() browser helper and generateReport() extracted from index.ts",
-      "type": "added",
-      "risk": "low",
-      "risk_reason": "Code moved verbatim from index.ts — no logic changes.",
-      "components": ["MCP Server"],
-      "lines_added": 42,
-      "lines_removed": 0,
-      "diff_snippet": "diff --git a/src/report.ts b/src/report.ts\nnew file mode 100644\n@@ -0,0 +1,42 @@\n+export function generateReport(analysisStr: string, outputPath: string, openBrowser: boolean): string {\n+  JSON.parse(analysisStr);\n+  const html = REPORT_TEMPLATE.replace('__PR_DATA__', analysisStr);\n+  const dir = path.dirname(outputPath);\n+  if (dir && dir !== '.') fs.mkdirSync(dir, { recursive: true });\n+  fs.writeFileSync(outputPath, html, 'utf8');\n+  if (openBrowser) openFile(outputPath);\n+  return `Report written to ${path.resolve(outputPath)}...`;\n+}"
-    },
-    {
-      "file": "src/types.ts",
-      "description": "New module: CommitInfo, FileChange, PRRawData interfaces extracted from index.ts",
-      "type": "added",
-      "risk": "low",
-      "risk_reason": "Interfaces moved verbatim — no type changes.",
-      "components": ["MCP Server"],
-      "lines_added": 25,
-      "lines_removed": 0,
-      "diff_snippet": "diff --git a/src/types.ts b/src/types.ts\nnew file mode 100644\n@@ -0,0 +1,25 @@\n+export interface CommitInfo { hash: string; message: string; author: string; date: string; }\n+export interface FileChange { status: string; file: string; }\n+export interface PRRawData { branch: string; target: string; commits: CommitInfo[]; files: FileChange[]; insertions: number; deletions: number; files_changed: number; diff: string; stat: string; }"
+      "file": "src/template.ts",
+      "description": "Nav bar made horizontally scrollable: removed fixed padding, added overflow-x:auto, -webkit-overflow-scrolling:touch, scrollbar-width:none, flex-shrink:0 on links, and moved horizontal padding to first/last-child pseudo-selectors.",
+      "diff_snippet": "diff --git a/src/template.ts b/src/template.ts\n--- a/src/template.ts\n+++ b/src/template.ts\n@@ -110 @@\n-      padding: 0 28px;\n+      overflow-x: auto;\n+      -webkit-overflow-scrolling: touch;\n+      scrollbar-width: none;\n+    }\n+    .nav::-webkit-scrollbar { display: none; }\n+      flex-shrink: 0;\n+    .nav a:first-child { padding-left: 28px; }\n+    .nav a:last-child  { padding-right: 28px; }"
     }
   ],
   "impacted_components": [
     {
-      "name": "MCP Server",
-      "files": ["src/index.ts", "src/git.ts", "src/report.ts", "src/types.ts"],
-      "risk": "low",
-      "description": "Internal restructuring only. Public tool interface (names, schemas, return shapes) is unchanged."
+      "name": "Report UI / Nav bar",
+      "description": "The sticky navigation bar in all generated HTML reports will now scroll horizontally on narrow viewports.",
+      "files": ["src/template.ts"]
     }
   ],
   "test_coverage": {
     "assessment": "none",
-    "notes": "No automated tests. Refactor verified by clean tsc build with no errors.",
-    "untested_files": [],
-    "test_files_changed": []
+    "notes": "CSS-only change in a self-contained HTML template; no automated tests exist for the report UI.",
+    "untested_files": []
   },
   "commits": [
     {
-      "hash": "53d9409",
-      "message": "refactor: split src/ into types, git, report, and index modules",
+      "hash": "f8b79ef",
+      "message": "fix: make nav bar horizontally scrollable on small screens",
       "author": "linus",
-      "date": "2026-03-08"
+      "date": "2026-03-09"
     }
   ]
 };

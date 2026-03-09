@@ -45,7 +45,7 @@ export function getPrData(
 
   // Commits: hash|subject|author|ISO-date (not filtered — always show full list)
   const logRaw = safeRun(
-    `git log "${target}...HEAD" --format="%H|%s|%an|%as" --no-merges`,
+    `git log "${target}..HEAD" --format="%H|%s|%an|%as" --no-merges`,
     cwd,
   );
   const commits: CommitInfo[] = logRaw
@@ -63,7 +63,7 @@ export function getPrData(
 
   // File status list (filtered if files param provided)
   const nameStatusRaw = safeRun(
-    `git diff "${target}...HEAD" --name-status ${pathArgs}`,
+    `git diff "${target}" HEAD --name-status ${pathArgs}`,
     cwd,
   );
   const files: FileChange[] = nameStatusRaw
@@ -78,11 +78,11 @@ export function getPrData(
     });
 
   // Stat summary (filtered)
-  const stat = safeRun(`git diff "${target}...HEAD" --stat ${pathArgs}`, cwd);
+  const stat = safeRun(`git diff "${target}" HEAD --stat ${pathArgs}`, cwd);
   const { files: filesChanged, insertions, deletions } = parseStatLine(stat);
 
   // Diff (filtered)
-  const diff = safeRun(`git diff "${target}...HEAD" ${pathArgs}`, cwd);
+  const diff = safeRun(`git diff "${target}" HEAD ${pathArgs}`, cwd);
 
   return { branch, target, commits, files, insertions, deletions, files_changed: filesChanged, diff, stat };
 }
