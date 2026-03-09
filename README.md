@@ -2,13 +2,39 @@
 
 **AI-powered interactive PR review reports for Claude Code.**
 
-Prism refracts your git diff into a clear, structured HTML report — classifying changes by risk, mapping them to components, assessing test coverage, and surfacing everything in a single self-contained page committed alongside your branch.
-
-When you run `/ship`, the report is committed to `.pr/index.html`, pushed, and a GitHub PR is opened with an AI-generated summary. A GitHub Actions workflow then deploys it to GitHub Pages and posts the link as a PR comment so reviewers get it automatically.
+Prism refracts your git diff into a clear, structured HTML report — classifying changes by risk, mapping them to components, and assessing test coverage — then commits it alongside your branch and deploys it to GitHub Pages so reviewers get a link automatically.
 
 ---
 
 ## How it works
+
+Prism has three parts that work together:
+
+### 1. MCP server (`src/`)
+
+A Node.js process that runs alongside Claude Code, exposing two tools:
+
+- **`get_pr_data`** — shells out to git to collect the diff, commit log, and stat summary for the current branch vs a target branch
+- **`generate_report`** — takes a structured JSON analysis, injects it into the self-contained HTML template, writes `.pr/index.html`, and opens it in the browser
+
+Claude Code connects to the MCP server via stdio. The server is registered in `~/.claude/settings.json` and starts automatically when Claude Code launches.
+
+### 2. Slash commands + hook (`plugin/`)
+
+Markdown files copied to `~/.claude/commands/` and `~/.claude/hooks/`. Claude Code loads these as first-class commands:
+
+- **`/review-pr`** — instructs Claude to call `get_pr_data`, analyse the diff, and call `generate_report`. Claude is the AI brain; the MCP tools are the hands.
+- **`/ship`** — same as `/review-pr`, then commits `.pr/index.html`, pushes the branch, and opens a GitHub PR with the AI-generated summary as the PR body.
+- **`/setup-repo`** — one-time setup for a repo: copies the GitHub Actions workflow, checks Actions permissions, and guides through enabling GitHub Pages.
+- **Pre-PR hook** — fires whenever `gh pr create` runs and prompts Claude to generate the report first if one isn't already committed.
+
+### 3. GitHub Actions workflow (`.github/workflows/pr-report.yml`)
+
+After running `/setup-repo` in a repo, every PR that includes a freshly generated `.pr/index.html` triggers this workflow:
+
+1. Checks whether `.pr/index.html` was actually committed in this PR (not stale from a previous one)
+2. If fresh: deploys the report to GitHub Pages at `https://<owner>.github.io/<repo>/prs/<number>/` and posts a PR comment with the link
+3. If missing/stale: posts a comment prompting the author to run `/ship`
 
 ```
 /ship
@@ -21,10 +47,12 @@ When you run `/ship`, the report is committed to `.pr/index.html`, pushed, and a
     │
     ├─ git commit + push + gh pr create  ← PR opened with AI summary
     │
-    └─ GitHub Actions deploys to Pages   ← report link posted on PR
+    └─ GitHub Actions                    ← deploys report to Pages
+           ├─ posts link as PR comment   ← reviewers get it automatically
+           └─ or prompts to run /ship    ← if report is missing
 ```
 
-The report includes:
+The report itself includes:
 - **Executive summary** — 2–3 sentence overview of what the PR does and its overall risk
 - **Major changes** — expandable cards with risk badge, component tags, and diff viewer
 - **Minor changes** — lower-signal changes still tracked, with diffs
@@ -57,7 +85,12 @@ cd prism-pr-review
 .\scripts\install.ps1
 ```
 
-This copies the slash commands to `~/.claude/commands/` and registers the prism MCP server in `~/.claude/settings.json`. **Restart Claude Code after installing.**
+The installer:
+1. Copies slash commands to `~/.claude/commands/`
+2. Copies the pre-PR hook to `~/.claude/hooks/`
+3. Registers the prism MCP server in `~/.claude/settings.json` using `npx -y prism-pr-review`
+
+**Restart Claude Code after installing.**
 
 ### Manual MCP setup
 
@@ -99,7 +132,7 @@ Full pipeline: generate report → commit → push → open GitHub PR with AI-ge
 
 ### `/setup-repo`
 
-One-time setup for a repo. Copies the GitHub Actions workflow into `.github/workflows/pr-report.yml`, verifies Actions permissions, and guides you through enabling GitHub Pages so PR report links are posted automatically on every PR.
+One-time setup for a repo. Copies `.github/workflows/pr-report.yml` into the current repo, verifies Actions permissions, and guides you through enabling GitHub Pages.
 
 ```
 /setup-repo
@@ -107,24 +140,23 @@ One-time setup for a repo. Copies the GitHub Actions workflow into `.github/work
 
 ---
 
-## GitHub integration
+## GitHub integration (Pages + PR comments)
 
-After running `/setup-repo` in a repo, every PR that includes a freshly generated `.pr/index.html` (from `/ship`) will automatically:
-
-1. Deploy the report to GitHub Pages at `https://<owner>.github.io/<repo>/prs/<number>/`
-2. Post a PR comment with a link to the report
-
-PRs opened without running `/ship` first get a comment prompting the author to generate one.
+After running `/setup-repo` in a repo, every PR that ships a fresh `.pr/index.html` via `/ship` will automatically get a report link posted as a PR comment.
 
 ### One-time Pages bootstrap
 
-The `gh-pages` branch is created automatically on the first workflow run. After that first run:
+The `gh-pages` branch is created on the first workflow run. After that first run:
 
 1. Go to **Settings → Pages**
 2. Set **Source** to `Deploy from branch → gh-pages → / (root)`
 3. Save — all future PRs will get report links automatically
 
-> **Note:** GitHub Actions must be enabled on the repo. Check **Settings → Actions → General → Allow all actions** if the workflow doesn't run.
+> **Note:** GitHub Actions must be enabled. Check **Settings → Actions → General → Allow all actions** if the workflow doesn't run.
+
+### How the freshness check works
+
+The workflow runs `git diff` between the base branch SHA and the PR head SHA to check whether `.pr/index.html` was actually modified in this PR. This prevents stale reports from a previous branch being deployed under the wrong PR number.
 
 ---
 
@@ -133,21 +165,25 @@ The `gh-pages` branch is created automatically on the first workflow run. After 
 ```
 prism-pr-review/
 ├── src/
-│   ├── index.ts                    # MCP server (get_pr_data + generate_report tools)
-│   └── template.ts                 # Self-contained HTML report template
+│   ├── index.ts          # MCP server entry — registers tools, routes requests
+│   ├── git.ts            # get_pr_data implementation (git shell calls)
+│   ├── report.ts         # generate_report implementation (write HTML, open browser)
+│   ├── template.ts       # Self-contained HTML report template (~600 lines)
+│   └── types.ts          # Shared TypeScript interfaces
 ├── plugin/
 │   ├── commands/
-│   │   ├── review-pr.md            # /review-pr slash command
-│   │   ├── ship.md                 # /ship slash command
-│   │   └── setup-repo.md          # /setup-repo slash command
+│   │   ├── review-pr.md  # /review-pr slash command prompt
+│   │   ├── ship.md       # /ship slash command prompt
+│   │   └── setup-repo.md # /setup-repo slash command prompt
 │   └── hooks/
-│       └── pre-pr-review.md        # Hook: prompts to generate report before gh pr create
+│       └── pre-pr-review.md  # Hook: prompt to generate report before gh pr create
 ├── .github/
 │   └── workflows/
-│       └── pr-report.yml           # Actions workflow: deploy report to Pages + post PR comment
+│       ├── pr-report.yml # Deploy report to Pages + post PR comment
+│       └── publish.yml   # Auto-publish to npm on version tag push
 ├── scripts/
-│   ├── install.sh                  # macOS/Linux installer
-│   └── install.ps1                 # Windows installer
+│   ├── install.sh        # macOS/Linux installer
+│   └── install.ps1       # Windows installer
 ├── package.json
 └── tsconfig.json
 ```
@@ -161,7 +197,7 @@ npm install
 npm run build       # compile TypeScript → dist/
 ```
 
-To test locally, point `~/.claude/settings.json` at the local build instead of npx:
+To test locally, point `~/.claude/settings.json` at the local build:
 
 ```json
 {
