@@ -27,10 +27,12 @@ export function generateReport(
   outputPath: string,
   openBrowser: boolean,
 ): string {
-  // Validate JSON before writing
-  JSON.parse(analysisStr);
+  // Validate JSON, then stamp the real generation time
+  const analysis = JSON.parse(analysisStr);
+  if (analysis.meta) analysis.meta.generated_at = new Date().toISOString();
+  const stamped = JSON.stringify(analysis);
 
-  const html = REPORT_TEMPLATE.replace('__PR_DATA__', analysisStr);
+  const html = REPORT_TEMPLATE.replace('__PR_DATA__', stamped);
 
   const dir = path.dirname(outputPath);
   if (dir && dir !== '.') fs.mkdirSync(dir, { recursive: true });
