@@ -22,7 +22,7 @@ npx prism-pr-review install
 Works on macOS, Linux, and Windows. This single command:
 1. Copies slash commands to `~/.claude/commands/`
 2. Copies the pre-PR hook to `~/.claude/hooks/`
-3. Adds the prism MCP server entry to `~/.claude/settings.json`
+3. Adds the prism MCP server entry to `~/.claude/mcp.json`
 
 **Restart Claude Code after installing.**
 
@@ -45,7 +45,7 @@ A Node.js process that runs alongside Claude Code, exposing two tools:
 - **`get_pr_data`** — shells out to git to collect the diff, commit log, and stat summary for the current branch vs a target branch
 - **`generate_report`** — takes a structured JSON analysis, injects it into the self-contained HTML template, writes `.pr/index.html`, and opens it in the browser
 
-Claude Code connects to the MCP server via stdio. The server is registered in `~/.claude/settings.json` and starts automatically when Claude Code launches.
+Claude Code connects to the MCP server via stdio. The server is registered in `~/.claude/mcp.json` and starts automatically when Claude Code launches.
 
 ### 2. Slash commands + hook (`plugin/`)
 

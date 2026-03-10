@@ -358,12 +358,14 @@ const DATA = __PR_DATA__;
 const h = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
 function riskBadge(r) {
+  if (!r || !['high','medium','low'].includes(r)) return '';
   const icons = { high: '⚠', medium: '~', low: '✓' };
   const labels = { high: 'HIGH', medium: 'MED', low: 'LOW' };
-  return \`<span class="risk \${r}">\${icons[r] || ''} \${labels[r] || r}</span>\`;
+  return \`<span class="risk \${r}">\${icons[r]} \${labels[r]}</span>\`;
 }
 
 function typeBadge(t) {
+  if (!t) return '';
   return \`<span class="type-badge \${t}">\${h(t)}</span>\`;
 }
 

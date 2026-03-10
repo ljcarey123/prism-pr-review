@@ -7,7 +7,7 @@ const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 const CLAUDE_DIR   = path.join(os.homedir(), '.claude');
 const COMMANDS_DIR = path.join(CLAUDE_DIR, 'commands');
 const HOOKS_DIR    = path.join(CLAUDE_DIR, 'hooks');
-const SETTINGS_PATH = path.join(CLAUDE_DIR, 'settings.json');
+const MCP_PATH = path.join(CLAUDE_DIR, 'mcp.json');
 
 const MCP_ENTRY = { command: 'npx', args: ['-y', 'prism-pr-review'] };
 
@@ -23,16 +23,16 @@ interface Settings {
   mcpServers?: Record<string, unknown>;
 }
 
-function readSettings(): Settings {
-  if (fs.existsSync(SETTINGS_PATH)) {
-    return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')) as Settings;
+function readMcp(): Settings {
+  if (fs.existsSync(MCP_PATH)) {
+    return JSON.parse(fs.readFileSync(MCP_PATH, 'utf8')) as Settings;
   }
   return {};
 }
 
-function writeSettings(cfg: Settings): void {
+function writeMcp(cfg: Settings): void {
   fs.mkdirSync(CLAUDE_DIR, { recursive: true });
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(cfg, null, 2) + '\n');
+  fs.writeFileSync(MCP_PATH, JSON.stringify(cfg, null, 2) + '\n');
 }
 
 export function install(): void {
@@ -49,11 +49,11 @@ export function install(): void {
   );
   console.log('✓ Installed pre-PR hook → ~/.claude/hooks/');
 
-  const cfg = readSettings();
+  const cfg = readMcp();
   cfg.mcpServers = cfg.mcpServers ?? {};
   cfg.mcpServers['prism'] = MCP_ENTRY;
-  writeSettings(cfg);
-  console.log('✓ Registered prism MCP server in ~/.claude/settings.json');
+  writeMcp(cfg);
+  console.log('✓ Registered prism MCP server in ~/.claude/mcp.json');
 
   console.log('\n  Restart Claude Code, then use /review-pr or /ship in any git repo.');
   console.log('  To uninstall: npx prism-pr-review uninstall\n');
@@ -68,10 +68,10 @@ export function uninstall(): void {
   if (fs.existsSync(hookPath)) fs.unlinkSync(hookPath);
   console.log('✓ Removed prism commands and hooks');
 
-  const cfg = readSettings();
+  const cfg = readMcp();
   delete cfg.mcpServers?.['prism'];
-  writeSettings(cfg);
-  console.log('✓ Removed prism from ~/.claude/settings.json');
+  writeMcp(cfg);
+  console.log('✓ Removed prism from ~/.claude/mcp.json');
 
   console.log('\n  Restart Claude Code to apply changes.\n');
 }
