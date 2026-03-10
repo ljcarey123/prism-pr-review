@@ -158,23 +158,52 @@ Parse the response:
 
 ## Step 5 — Bootstrap GitHub Pages
 
-The workflow publishes to a `gh-pages` branch, but GitHub Pages must be enabled manually in the repo settings. The `gh-pages` branch won't exist until the first workflow run.
+GitHub Pages must be enabled and pointed at the `gh-pages` branch. Automate this fully:
 
-Tell the user:
-
-> **Pages setup (one-time, after your first PR)**
->
-> 1. Run `/ship` on a feature branch — this triggers the workflow and creates the `gh-pages` branch
-> 2. Once the Actions run completes, go to:
->    **Settings → Pages → Source: Deploy from branch → gh-pages → / (root) → Save**
-> 3. All future PRs will automatically get an interactive report link in the PR comments
-
-If `gh` is available, check whether Pages is already enabled:
+### 5a — Check if Pages is already enabled
 ```bash
 gh api repos/{owner}/{repo}/pages 2>/dev/null
 ```
-- If it returns a `url` field — Pages is already live, tell the user.
-- If it 404s — Pages not yet set up, show the instructions above.
+- If it returns a `url` field — Pages is already live. Skip to Step 6 and report the URL.
+- If it 404s — continue with setup below.
+
+### 5b — Ensure the `gh-pages` branch exists
+
+The Pages API requires the branch to exist before it can be configured. Check:
+```bash
+git ls-remote --heads origin gh-pages
+```
+
+If the branch doesn't exist, create it as an empty orphan branch and push it:
+```bash
+git fetch origin
+git checkout --orphan gh-pages
+git rm -rf . 2>/dev/null || true
+echo '<!DOCTYPE html><html><body><p>prism reports will appear here after the first /ship run.</p></body></html>' > index.html
+git add index.html
+git commit -m "chore: initialise gh-pages branch for prism reports"
+git push origin gh-pages
+git checkout -        # return to the original branch
+```
+
+### 5c — Enable Pages via the API
+```bash
+gh api repos/{owner}/{repo}/pages \
+  --method POST \
+  --field source[branch]=gh-pages \
+  --field source[path]=/ \
+  2>/dev/null
+```
+
+If that returns a `url` — Pages is now enabled. Report the URL.
+
+If it fails with a 409 (already exists) — Pages was already on, fetch and report the URL:
+```bash
+gh api repos/{owner}/{repo}/pages --jq '.html_url'
+```
+
+If it fails with a 422 or 403 — the token doesn't have the `pages` scope or the repo is a fork with Pages disabled. Tell the user to enable manually:
+> Go to **Settings → Pages → Source: Deploy from branch → gh-pages → / (root) → Save**
 
 ---
 
