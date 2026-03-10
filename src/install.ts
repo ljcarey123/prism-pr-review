@@ -10,7 +10,9 @@ const HOOKS_DIR      = path.join(CLAUDE_DIR, 'hooks');
 const CLAUDE_JSON    = path.join(os.homedir(), '.claude.json');
 
 const { version } = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8')) as { version: string };
-const MCP_ENTRY = { command: 'npx', args: ['-y', `prism-pr-review@${version}`] };
+const MCP_ENTRY = process.platform === 'win32'
+  ? { command: 'cmd', args: ['/c', 'npx', '-y', `prism-pr-review@${version}`] }
+  : { command: 'npx', args: ['-y', `prism-pr-review@${version}`] };
 
 const COMMANDS = [
   { src: 'plugin/commands/review-pr.md',   dest: 'review-pr.md'   },
