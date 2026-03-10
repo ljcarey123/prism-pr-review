@@ -21,7 +21,7 @@ This copies slash commands to `~/.claude/commands/`, the pre-PR hook to `~/.clau
   "mcpServers": {
     "prism": {
       "command": "npx",
-      "args": ["-y", "prism-pr-review@0.1.6"]
+      "args": ["-y", "prism-pr-review"]
     }
   }
 }
@@ -32,8 +32,6 @@ This copies slash commands to `~/.claude/commands/`, the pre-PR hook to `~/.clau
 ```bash
 npx prism-pr-review uninstall   # to remove
 ```
-
-> **Security note:** The install script pins the MCP entry to the installed version (e.g. `prism-pr-review@0.1.6`) rather than `latest`, so Claude Code won't silently pick up a future compromised release. To upgrade, re-run `npx prism-pr-review install` with the new version.
 
 ---
 
