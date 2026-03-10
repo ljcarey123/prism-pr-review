@@ -3,13 +3,14 @@ import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CLAUDE_DIR   = path.join(os.homedir(), '.claude');
-const COMMANDS_DIR = path.join(CLAUDE_DIR, 'commands');
-const HOOKS_DIR    = path.join(CLAUDE_DIR, 'hooks');
-const MCP_PATH = path.join(CLAUDE_DIR, 'mcp.json');
+const PACKAGE_ROOT   = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const CLAUDE_DIR     = path.join(os.homedir(), '.claude');
+const COMMANDS_DIR   = path.join(CLAUDE_DIR, 'commands');
+const HOOKS_DIR      = path.join(CLAUDE_DIR, 'hooks');
+const CLAUDE_JSON    = path.join(os.homedir(), '.claude.json');
 
-const MCP_ENTRY = { command: 'npx', args: ['-y', 'prism-pr-review'] };
+const { version } = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8')) as { version: string };
+const MCP_ENTRY = { command: 'npx', args: ['-y', `prism-pr-review@${version}`] };
 
 const COMMANDS = [
   { src: 'plugin/commands/review-pr.md',   dest: 'review-pr.md'   },
@@ -19,20 +20,20 @@ const COMMANDS = [
 const HOOK_SRC  = 'plugin/hooks/pre-pr-review.md';
 const HOOK_DEST = 'pre-pr-review.md';
 
-interface Settings {
+interface ClaudeConfig {
   mcpServers?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
-function readMcp(): Settings {
-  if (fs.existsSync(MCP_PATH)) {
-    return JSON.parse(fs.readFileSync(MCP_PATH, 'utf8')) as Settings;
+function readClaudeJson(): ClaudeConfig {
+  if (fs.existsSync(CLAUDE_JSON)) {
+    return JSON.parse(fs.readFileSync(CLAUDE_JSON, 'utf8')) as ClaudeConfig;
   }
   return {};
 }
 
-function writeMcp(cfg: Settings): void {
-  fs.mkdirSync(CLAUDE_DIR, { recursive: true });
-  fs.writeFileSync(MCP_PATH, JSON.stringify(cfg, null, 2) + '\n');
+function writeClaudeJson(cfg: ClaudeConfig): void {
+  fs.writeFileSync(CLAUDE_JSON, JSON.stringify(cfg, null, 2) + '\n');
 }
 
 export function install(): void {
@@ -49,11 +50,11 @@ export function install(): void {
   );
   console.log('✓ Installed pre-PR hook → ~/.claude/hooks/');
 
-  const cfg = readMcp();
+  const cfg = readClaudeJson();
   cfg.mcpServers = cfg.mcpServers ?? {};
   cfg.mcpServers['prism'] = MCP_ENTRY;
-  writeMcp(cfg);
-  console.log('✓ Registered prism MCP server in ~/.claude/mcp.json');
+  writeClaudeJson(cfg);
+  console.log('✓ Registered prism MCP server in ~/.claude.json');
 
   console.log('\n  Restart Claude Code, then use /review-pr or /ship in any git repo.');
   console.log('  To uninstall: npx prism-pr-review uninstall\n');
@@ -68,10 +69,10 @@ export function uninstall(): void {
   if (fs.existsSync(hookPath)) fs.unlinkSync(hookPath);
   console.log('✓ Removed prism commands and hooks');
 
-  const cfg = readMcp();
+  const cfg = readClaudeJson();
   delete cfg.mcpServers?.['prism'];
-  writeMcp(cfg);
-  console.log('✓ Removed prism from ~/.claude/mcp.json');
+  writeClaudeJson(cfg);
+  console.log('✓ Removed prism from ~/.claude.json');
 
   console.log('\n  Restart Claude Code to apply changes.\n');
 }
