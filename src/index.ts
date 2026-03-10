@@ -54,7 +54,7 @@ server.registerTool(
     inputSchema: {
       analysis:     z.string().describe('JSON string conforming to the PRAnalysis schema'),
       output_path:  z.string().optional().describe('Where to write the HTML file (default: .pr/index.html)'),
-      open_browser: z.boolean().optional().describe('Open the file in the default browser after writing (default: true)'),
+      open_browser: z.coerce.boolean().optional().describe('Open the file in the default browser after writing (default: true)'),
     },
   },
   async ({ analysis, output_path, open_browser }) => {
