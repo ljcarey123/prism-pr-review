@@ -29,7 +29,17 @@ export function generateReport(
 ): string {
   // Validate JSON, then stamp the real generation time
   const analysis = JSON.parse(analysisStr);
-  if (analysis.meta) analysis.meta.generated_at = new Date().toISOString();
+  if (!analysis.meta) {
+    analysis.meta = {
+      branch:        analysis.branch  ?? '',
+      target:        analysis.target  ?? '',
+      commit_count:  (analysis.commits ?? []).length,
+      files_changed: (analysis.major_changes ?? []).length + (analysis.minor_changes ?? []).length,
+      insertions:    0,
+      deletions:     0,
+    };
+  }
+  analysis.meta.generated_at = new Date().toISOString();
   const stamped = JSON.stringify(analysis);
 
   const html = REPORT_TEMPLATE.replace('__PR_DATA__', stamped);
