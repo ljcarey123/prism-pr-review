@@ -28,7 +28,7 @@ gh auth status                     # confirm gh CLI is authenticated
 - If `gh` is not authenticated, stop with instructions: `gh auth login`.
 
 Parse arguments:
-- Target branch: first word in `$ARGUMENTS` that doesn't start with `--`, else default `main`
+- Target branch: first word in `$ARGUMENTS` that doesn't start with `--`, else default `main` (or `master` if `main` doesn't exist — check with `git branch -r` or `git rev-parse --verify main`)
 - Draft flag: `true` if `--draft` appears in `$ARGUMENTS`
 
 ---
